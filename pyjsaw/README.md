@@ -5,10 +5,10 @@
   <img src="https://raw.githubusercontent.com/valq7711/vue3pyj/master/static/vue3pyj_art1.png">
 </p>
 
-# WebIDE for [py4web](http://py4web.com) (evolution of the web2py) 
+# WebIDE for [Websaw](http://websaw.com) 
 ## Installation
 0. Just clone or download and unpack this repo into `py4web/apps/vue3pyj` folder (you can choose another name)
 1. It uses the same password as **\_dashboard**
-2. Go to http://your_server/vue3pyj and do something awesome!
+2. Go to http://your_server/pyjsaw/ and do something awesome!
 
 Vue3pyj is written using itself (see *vue3pyj/vuepy* folder). Small documentation is [here](https://github.com/valq7711/vue2pyj)  
