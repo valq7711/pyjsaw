@@ -9,6 +9,6 @@
 ## Installation
 0. Just clone or download and unpack this repo into `py4web/apps/vue3pyj` folder (you can choose another name)
 1. It uses the same password as **\_dashboard**
-2. Go to http://your_server/vue3pyj and do something awesome!
+2. Go to http://your_server/pyjsaw/ and do something awesome!
 
 Pyjsaw is written using itself (see *pyjsaw/vuepy* folder). Small documentation is [here](https://github.com/valq7711/vue2pyj)  
