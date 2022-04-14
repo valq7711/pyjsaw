@@ -7558,7 +7558,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
         }
         raise_error (err, opt) {
             var self = this;
-            if (err.response.status === 403 && self.login) {
+            if (err.response.status === 401 && self.login) {
                 return self.login().then(function() {
                     return self.srv[opt.meth](opt.f, opt.args);
                 });
