@@ -1,0 +1,3 @@
+recursive-include pyjsaw/static *.*
+recursive-include pyjsaw/templates *.*
+recursive-include pyjsaw/vuepy *.*
