@@ -43,7 +43,7 @@ class API:
             self.bus.$emit('server', {event: 'done', emitter: self, data: resp.data })
 
     def raise_error(self, err, opt):
-        if err.response.status == 403 and self.login: # forbidden - try login
+        if err.response.status == 401 and self.login: # not authorized - try login
             return self.login()
             .then(def(): return self.srv[opt.meth](opt.f, opt.args);)
         self.last_error = err
