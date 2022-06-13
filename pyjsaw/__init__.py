@@ -7,8 +7,8 @@ from pydal.validators import CRYPT
 from .fs2json import FS2Json
 
 
-__version__ = '0.0.1'
-__static_version__ = '1.0.3'
+__version__ = '0.0.2'
+__static_version__ = '1.0.4'
 
 fs2json = FS2Json()
 
