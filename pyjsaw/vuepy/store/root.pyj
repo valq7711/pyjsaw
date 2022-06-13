@@ -13,19 +13,27 @@ async import Vue
 
 Vue.use(RS_store)
 
-def path_map(web23py):
+
+def path_map():
+    def map_path(pth, ext):
+        pth = pth.split('/')
+        if pth[0] is 'root' or not pth[0]:
+            pth.shift()
+
+        if len(pth) > 2 and pth[1] is 'spa':
+            pth.shift()  # remove `vuepy`
+            pth[0] = '/static/spa'
+        elif ext is 'html':
+            pth[0] = '/templates'
+        else:
+            # js, css
+            pth[0] = f'/static/${ext}'
+        return pth.join('/') + f'.${ext}'
+
     ret = {
-        html_dir : {
-            'web2py': '/views',
-            'web3py': '/templates'
-        },
-        'js': '/static/js/',
-        'css': '/static/css/',
-        def html(self, pth):
-            pth = pth.split('/')
-            pth[0] is 'root' or not pth[0] and pth.shift()
-            pth[0] = ret.html_dir[web23py] # replace `vuepy`
-            return pth.join('/') + '.html'
+        js: (def(p): return map_path(p, 'js');),
+        css: (def(p): return map_path(p, 'css');),
+        html: (def(p): return map_path(p, 'html');),
     }
     return ret
 
@@ -116,7 +124,7 @@ class Root:
         self.api.get_local = def(): return self.local_setting
 
         # output for compile
-        self.output_path_map = path_map(web23py)
+        self.output_path_map = path_map()
 
         settings = window.localStorage.getItem('vue3pyj')
         self.local_setting =  settings and JSON.parse(settings) or {}

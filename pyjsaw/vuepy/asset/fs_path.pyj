@@ -60,5 +60,5 @@ def path_split(pth):
         fname_no_ext : fp_info[3],
         ext : fp_info[5],
     }
-    ret.tail = ret.fname = ret.ext ? ret.fname_no_ext + '.' + ret.ext : ret.fname_no_ext
+    ret.tail = ret.fname = (ret.ext ? ret.fname_no_ext + '.' + ret.ext : ret.fname_no_ext)
     return ret
