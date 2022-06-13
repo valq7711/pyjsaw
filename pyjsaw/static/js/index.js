@@ -7673,21 +7673,32 @@ var ՐՏ_modules = ՐՏ_def_modules();
     var CodeMirror = ՐՏ_modules["CodeMirror"];
     var Vue = ՐՏ_modules["Vue"];
     Vue.use(RS_store);
-    function path_map(web23py) {
+    function path_map() {
         var ret;
+        function map_path(pth, ext) {
+            pth = pth.split("/");
+            if (pth[0] === "root" || !pth[0]) {
+                pth.shift();
+            }
+            if (len(pth) > 2 && pth[1] === "spa") {
+                pth.shift();
+                pth[0] = "/static/spa";
+            } else if (ext === "html") {
+                pth[0] = "/templates";
+            } else {
+                pth[0] = `/static/${ext}`;
+            }
+            return pth.join("/") + `.${ext}`;
+        }
         ret = {
-            html_dir: {
-                "web2py": "/views",
-                "web3py": "/templates"
+            js: function(p) {
+                return map_path(p, "js");
             },
-            "js": "/static/js/",
-            "css": "/static/css/",
-            html: function html(pth) {
-                var self = this;
-                pth = pth.split("/");
-                pth[0] === "root" || !pth[0] && pth.shift();
-                pth[0] = ret.html_dir[web23py];
-                return pth.join("/") + ".html";
+            css: function(p) {
+                return map_path(p, "css");
+            },
+            html: function(p) {
+                return map_path(p, "html");
             }
         };
         return ret;
@@ -7789,7 +7800,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
             self.api.get_local = function() {
                 return self.local_setting;
             };
-            self.output_path_map = path_map(web23py);
+            self.output_path_map = path_map();
             settings = window.localStorage.getItem("vue3pyj");
             self.local_setting = settings && JSON.parse(settings) || {};
             self.provide = (ՐՏ_109 = {

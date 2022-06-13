@@ -86,6 +86,7 @@ def get_fs(ctx: Context, w23p_app=None):
             'js': {},
             'css': '*',
             'components': '*',
+            'spa': '*',
         },
         'modules': '*',
         'models': '*',
