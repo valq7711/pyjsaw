@@ -1,0 +1,41 @@
+[project]
+name = "pyjsaw"
+description = "pyjsaw - funny IDE for websaw framework"
+requires-python = ">=3.7"
+license = {file = "LICENSE"}
+keywords = ["python", "webapplication", "vue"]
+authors = [
+  { name="Valery Kucherov", email="valq7711@gmail.com" },
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "websaw"
+]
+
+dynamic = ["version"]
+
+[project.urls]
+homepage = "https://github.com/valq7711/websaw"
+repository = "https://github.com/valq7711/websaw"
+
+
+[tool.setuptools]
+packages = ["pyjsaw"]
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = {attr = "pyjsaw.__version__"}

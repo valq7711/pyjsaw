@@ -3,7 +3,7 @@ v-def templ_editor:
         div(v-if = '!doc_num', class = 'hero'):
             div(class = 'hero-body'):
                 div(class = 'container  has-text-centered'):
-                    img(:src = "$root.v3p_static + '/vue3pyj_art.png'"):
+                    img(:src = "$root.v3p_static + '/pyjsaw_art.png'"):
                     #h1(class = 'title is-size-1', style ='background-color: white'):
                     #    span(style = 'color: #42b983;'):'Vue'
                     #    span(class = 'v2p_char',  style = 'color: black;'):'{{w23p_ver}}'

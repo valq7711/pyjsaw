@@ -7,7 +7,7 @@ from typing import Union
 import hashlib
 from .xdict import XDict
 
-FILE_MASK_REX = re.compile(r'(.(?!\.min))+.\.(py|vuepy|pyj|css|html|js|md|txt|sql)$', flags=re.I)
+FILE_MASK_REX = re.compile(r'(.(?!\.min))+.\.(py|vuepy|pyj|css|html|js|md|txt|sql|prj)$', flags=re.I)
 
 
 def to_bytes(obj, charset='utf-8', errors='strict'):

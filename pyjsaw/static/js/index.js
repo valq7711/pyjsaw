@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-var ՐՏ_1, ՐՏ_14, ՐՏ_15, ՐՏ_19, ՐՏ_81, ՐՏ_82, ՐՏ_83, ՐՏ_84, ՐՏ_85, ՐՏ_88, ՐՏ_89, ՐՏ_90, ՐՏ_94, ՐՏ_95, ՐՏ_96, ՐՏ_97, ՐՏ_98, ՐՏ_99, ՐՏ_105, ՐՏ_108, ՐՏ_111;
+var ՐՏ_1, ՐՏ_14, ՐՏ_15, ՐՏ_19, ՐՏ_81, ՐՏ_82, ՐՏ_83, ՐՏ_84, ՐՏ_85, ՐՏ_88, ՐՏ_89, ՐՏ_90, ՐՏ_94, ՐՏ_95, ՐՏ_96, ՐՏ_97, ՐՏ_98, ՐՏ_100, ՐՏ_105, ՐՏ_108, ՐՏ_111;
 function enumerate(item) {
     var arr, iter, i;
     arr = [];
@@ -68,7 +68,7 @@ function ՐՏ_type(obj) {
     return obj && obj.constructor && obj.constructor.name ? obj.constructor.name : Object.prototype.toString.call(obj).slice(8, -1);
 }
 function ՐՏ_eq(a, b) {
-    var ՐՏitr76, ՐՏidx76;
+    var ՐՏitr78, ՐՏidx78;
     var i;
     if (a === b) {
         return true;
@@ -93,9 +93,9 @@ function ՐՏ_eq(a, b) {
         if (Object.keys(a).length !== Object.keys(b).length) {
             return false;
         }
-        ՐՏitr76 = ՐՏ_Iterable(a);
-        for (ՐՏidx76 = 0; ՐՏidx76 < ՐՏitr76.length; ՐՏidx76++) {
-            i = ՐՏitr76[ՐՏidx76];
+        ՐՏitr78 = ՐՏ_Iterable(a);
+        for (ՐՏidx78 = 0; ՐՏidx78 < ՐՏitr78.length; ՐՏidx78++) {
+            i = ՐՏitr78[ՐՏidx78];
             if (!ՐՏ_eq(a[i], b[i])) {
                 return false;
             }
@@ -198,6 +198,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
 ՐՏ_modules.ՐՏ_def("components.dropdown");
 ՐՏ_modules.ՐՏ_def("components.navbar");
 ՐՏ_modules.ՐՏ_def("components.navbar_item");
+ՐՏ_modules.ՐՏ_def("store.utils");
 ՐՏ_modules.ՐՏ_def("store.editor");
 ՐՏ_modules.ՐՏ_def("store.explorer");
 ՐՏ_modules.ՐՏ_def("server");
@@ -5393,7 +5394,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
     var __name__ = "components.editor";
 
     var templ_editor, vc;
-    templ_editor = "\n<div>\n    <div  v-if = '!doc_num' class = 'hero'>\n        <div  class = 'hero-body'>\n            <div  class = 'container  has-text-centered'>\n                <img  :src = \"$root.v3p_static + '/vue3pyj_art.png'\"/>\n            </div>\n        </div>\n    </div>\n    <div  v-show = 'doc_num' class = 'editor-grid'>\n        <div>\n            <div  class = 'tabs is-boxed mt-1 mb-0 active-has-shadow'>\n                <ul>\n                    <li  v-for = 'doc, doc_k, idx in doc_infos' :key = 'doc_k' :class = \"{'is-active': doc_num == doc_k}\">\n                        <a  @click = '($event.v3p_close ?  edit_focus() : (swap_doc(doc_k), edit_focus()))'>\n                            <span>\n                                {{doc.name}}\n                            </span>\n                            <span  class = 'icon' @click = '($event.v3p_close = true, close(doc_k))'>\n                                <i  class = 'fa fa-times' :style = '{color: doc.is_saved ? null : \"red\"}' :title = 'doc.is_saved ? null : \"not saved\"'></i>\n                            </span>\n                        </a>\n                    </li>\n                </ul>\n            </div>\n        </div>\n        <div>\n            <div  class = 'level has-shadow py-1'>\n                <div  class = 'level-left ml-3'>\n                    <div  class = 'level-item'>\n                        <span  class = 'has-text-weight-bold' style = 'min-width:200px;'>{{doc_num && doc_info.name || \"\"}}</span>\n                    </div>\n                    <div  class = 'level-item'>\n                        <span  style = 'min-width:150px;'>ln: {{cursor.line+1}} col: {{cursor.ch}}</span>\n                    </div>\n                    <div  class = 'level-item'>\n                        <button  class = 'button' :class = \"{'is-primary': vim_mode}\" @click = 'toggle_vim()' title = 'toggle Vim-mode [Alt-v]'>Vim</button>\n                    </div>\n                </div>\n                <div  class = 'level-right mr-3'>\n                    <div  class = 'level-item'>\n                        <button  class = 'button' @click = \"open_dir\">\n                            {{doc_dir}}\n                        </button>\n                        <span  class = 'pl-2' @click = \"open_dir\">/ {{doc_info && doc_info.name}}</span>\n                    </div>\n                </div>\n            </div>\n        </div>\n        <div  style = 'overflow:auto;' @keydown.alt.81 = 'swap_prev'>\n        <div  class = 'editor-window'>\n            <div  ref = 'cm_el' style = 'height:100%;'></div>\n        </div></div>\n        <div>\n            <div  style = 'height:45px;'>\n                <div  v-if = 'error' @click = 'go_error' style = 'cursor:pointer;'>\n                    <div>\n                        File: {{error.filename}}\n                    </div>\n                    <template  v-if = 'error.readfile_error'>\n                        {{error.message}} {{error.readfile_error.line}}:{{error.readfile_error.col}}\n                    </template>\n                    <template  v-else>\n                        {{error.message}} {{error.line}}:{{error.col}}\n                    </template>\n                    <div>{{error.stack}}</div>\n                </div>\n                <div  v-else>ok</div>\n            </div>\n        </div>\n    </div>\n</div>\n";
+    templ_editor = "\n<div>\n    <div  v-if = '!doc_num' class = 'hero'>\n        <div  class = 'hero-body'>\n            <div  class = 'container  has-text-centered'>\n                <img  :src = \"$root.v3p_static + '/pyjsaw_art.png'\"/>\n            </div>\n        </div>\n    </div>\n    <div  v-show = 'doc_num' class = 'editor-grid'>\n        <div>\n            <div  class = 'tabs is-boxed mt-1 mb-0 active-has-shadow'>\n                <ul>\n                    <li  v-for = 'doc, doc_k, idx in doc_infos' :key = 'doc_k' :class = \"{'is-active': doc_num == doc_k}\">\n                        <a  @click = '($event.v3p_close ?  edit_focus() : (swap_doc(doc_k), edit_focus()))'>\n                            <span>\n                                {{doc.name}}\n                            </span>\n                            <span  class = 'icon' @click = '($event.v3p_close = true, close(doc_k))'>\n                                <i  class = 'fa fa-times' :style = '{color: doc.is_saved ? null : \"red\"}' :title = 'doc.is_saved ? null : \"not saved\"'></i>\n                            </span>\n                        </a>\n                    </li>\n                </ul>\n            </div>\n        </div>\n        <div>\n            <div  class = 'level has-shadow py-1'>\n                <div  class = 'level-left ml-3'>\n                    <div  class = 'level-item'>\n                        <span  class = 'has-text-weight-bold' style = 'min-width:200px;'>{{doc_num && doc_info.name || \"\"}}</span>\n                    </div>\n                    <div  class = 'level-item'>\n                        <span  style = 'min-width:150px;'>ln: {{cursor.line+1}} col: {{cursor.ch}}</span>\n                    </div>\n                    <div  class = 'level-item'>\n                        <button  class = 'button' :class = \"{'is-primary': vim_mode}\" @click = 'toggle_vim()' title = 'toggle Vim-mode [Alt-v]'>Vim</button>\n                    </div>\n                </div>\n                <div  class = 'level-right mr-3'>\n                    <div  class = 'level-item'>\n                        <button  class = 'button' @click = \"open_dir\">\n                            {{doc_dir}}\n                        </button>\n                        <span  class = 'pl-2' @click = \"open_dir\">/ {{doc_info && doc_info.name}}</span>\n                    </div>\n                </div>\n            </div>\n        </div>\n        <div  style = 'overflow:auto;' @keydown.alt.81 = 'swap_prev'>\n        <div  class = 'editor-window'>\n            <div  ref = 'cm_el' style = 'height:100%;'></div>\n        </div></div>\n        <div>\n            <div  style = 'height:45px;'>\n                <div  v-if = 'error' @click = 'go_error' style = 'cursor:pointer;'>\n                    <div>\n                        File: {{error.filename}}\n                    </div>\n                    <template  v-if = 'error.readfile_error'>\n                        {{error.message}} {{error.readfile_error.line}}:{{error.readfile_error.col}}\n                    </template>\n                    <template  v-else>\n                        {{error.message}} {{error.line}}:{{error.col}}\n                    </template>\n                    <div>{{error.stack}}</div>\n                </div>\n                <div  v-else>ok</div>\n            </div>\n        </div>\n    </div>\n</div>\n";
     var RS_vue = ՐՏ_modules["asset.rs_vue"].RS_vue;var V_collector = ՐՏ_modules["asset.rs_vue"].V_collector;
     vc = new V_collector();
     
@@ -5865,7 +5866,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
     var __name__ = "components.base_layout";
 
     var templ, modal_demo, vc;
-    templ = "\n<div  data-vc = 'layout'>\n    <XNavbar  :fixed_top = 'true' class = 'is-dark lift' :menus = 'menus'>\n        <template  v-slot:brand><NavbarItem><img  :src = \"$root.v3p_static + '/vue3pyj_logo.png'\" class = 'metalic-btn' style = 'border-radius:6px; padding:3px' alt = \"vue3pyj\"/></NavbarItem></template>\n        <template  v-slot:search>\n            <NavbarItem  :dropdown = 'true' :arrowless = 'true' :use_activator = 'true' :panel = 'true'>\n                <template  v-slot:label = \"{activator}\">\n                    <div  class = 'field has-addons'>\n                        <p  class = 'control'>\n                            <input  ref = 'search' class = 'input' type = 'text' placeholder = \"Global search\" @keyup.enter = 'search(activator)'/>\n                        </p>\n                        <p  class = 'control'>\n                            <button  class = 'button is-info' @click.stop = 'search(activator)'>\n                                <i  class = 'fa fa-search'></i>\n                            </button>\n                        </p>\n                    </div>\n                </template>\n                <template  v-slot:default = \"{activator}\">\n                    <SearchView  :activator = 'activator'></SearchView>\n                </template>\n            </NavbarItem>\n        </template>\n        <template  v-slot:theme>\n            <NavbarItem  :dropdown = 'true' :arrowless = 'true' :use_activator = 'true' :panel = 'true'>\n                <template  v-slot:label = \"{activator}\">\n                    <div  class = 'field has-addons'>\n                        <p  class = 'control'>\n                            <div  class = 'select'>\n                                <select  v-model = 'css_theme'>\n                                    <option  v-for = 'theme in css_themes'>\n                                        {{theme}}\n                                    </option>\n                                </select>\n                            </div>\n                        </p>\n                    </div>\n                </template>\n                <template  v-slot:default = \"{activator}\">\n                    <SearchView  :activator = 'activator'></SearchView>\n                </template>\n            </NavbarItem>\n        </template>\n        <template  v-slot:flash = \"{side}\">\n            <NavbarItem  ref = 'flash' :dropdown = 'true' :hoverable = 'true' :side = \"side\">\n                <template  v-slot:label>\n                    <i  class = 'fa fa-bullhorn fa-flip-horizontal'></i>\n                </template>\n                <NavbarItem  class = 'px-3'>\n                    <div  class = 'notification py-1' :class = \"'is-'+flash_status\">\n                        <template  v-if = 'flash.component'>\n                            <component  :is = 'flash.component' v-bind = 'flash.cargs'></component>\n                        </template>\n                        <template  v-else>\n                            {{flash.msg}}\n                        </template>\n                    </div>\n                </NavbarItem>\n            </NavbarItem>\n        </template>\n    </XNavbar>\n    <main>\n        <slot></slot>\n    </main>\n</div>\n";
+    templ = "\n<div  data-vc = 'layout'>\n    <XNavbar  :fixed_top = 'true' class = 'is-dark lift' :menus = 'menus'>\n        <template  v-slot:brand><NavbarItem><img  :src = \"$root.v3p_static + '/pyjsaw_logo.png'\" class = 'metalic-btn' style = 'border-radius:6px; padding:3px' alt = \"PYJSAW\"/></NavbarItem></template>\n        <template  v-slot:search>\n            <NavbarItem  :dropdown = 'true' :arrowless = 'true' :use_activator = 'true' :panel = 'true'>\n                <template  v-slot:label = \"{activator}\">\n                    <div  class = 'field has-addons'>\n                        <p  class = 'control'>\n                            <input  ref = 'search' class = 'input' type = 'text' placeholder = \"Global search\" @keyup.enter = 'search(activator)'/>\n                        </p>\n                        <p  class = 'control'>\n                            <button  class = 'button is-info' @click.stop = 'search(activator)'>\n                                <i  class = 'fa fa-search'></i>\n                            </button>\n                        </p>\n                    </div>\n                </template>\n                <template  v-slot:default = \"{activator}\">\n                    <SearchView  :activator = 'activator'></SearchView>\n                </template>\n            </NavbarItem>\n        </template>\n        <template  v-slot:theme>\n            <NavbarItem  :dropdown = 'true' :arrowless = 'true' :use_activator = 'true' :panel = 'true'>\n                <template  v-slot:label = \"{activator}\">\n                    <div  class = 'field has-addons'>\n                        <p  class = 'control'>\n                            <div  class = 'select'>\n                                <select  v-model = 'css_theme'>\n                                    <option  v-for = 'theme in css_themes'>\n                                        {{theme}}\n                                    </option>\n                                </select>\n                            </div>\n                        </p>\n                    </div>\n                </template>\n                <template  v-slot:default = \"{activator}\">\n                    <SearchView  :activator = 'activator'></SearchView>\n                </template>\n            </NavbarItem>\n        </template>\n        <template  v-slot:flash = \"{side}\">\n            <NavbarItem  ref = 'flash' :dropdown = 'true' :hoverable = 'true' :side = \"side\">\n                <template  v-slot:label>\n                    <i  class = 'fa fa-bullhorn fa-flip-horizontal'></i>\n                </template>\n                <NavbarItem  class = 'px-3'>\n                    <div  class = 'notification py-1' :class = \"'is-'+flash_status\">\n                        <template  v-if = 'flash.component'>\n                            <component  :is = 'flash.component' v-bind = 'flash.cargs'></component>\n                        </template>\n                        <template  v-else>\n                            {{flash.msg}}\n                        </template>\n                    </div>\n                </NavbarItem>\n            </NavbarItem>\n        </template>\n    </XNavbar>\n    <main>\n        <slot></slot>\n    </main>\n</div>\n";
     modal_demo = "\n<XModal>\n    <template  v-slot:title>\n        title\n    </template>\n    <template  v-slot:body>\n        body\n    </template>\n    <template  v-slot:footer>\n        <button  class = 'button' @click = \"$emit('ok')\">ok</button>\n        <button  class = 'button' @click = \"$emit('cancel')\">cancel</button>\n    </template>\n</XModal>\n";
     var V_collector = ՐՏ_modules["asset.rs_vue"].V_collector;var RS_vue = ՐՏ_modules["asset.rs_vue"].RS_vue;
     var modal = ՐՏ_modules["components.modal"];var search_view = ՐՏ_modules["components.search_view"];
@@ -6422,6 +6423,32 @@ var ՐՏ_modules = ՐՏ_def_modules();
     return ՐՏ_mod["exports"];
 };
 
+ՐՏ_modules["ՐՏ:store.utils"].body = function(){
+    var __name__ = "store.utils";
+
+    function map_ftype(fp) {
+        var ՐՏ_99;
+        var map_type, ext;
+        map_type = {};
+        map_type["py"] = "python";
+        map_type["pyj"] = "rapydscript";
+        map_type["vuepy"] = "vuepy";
+        map_type["js"] = "javascript";
+        map_type["css"] = "css";
+        map_type["html"] = {
+            name: "htmlmixed",
+            tags: {
+                script: [ [ "type", /^text\/(x-)?python$/, "text/x-python" ], [ null, null, "javascript" ] ]
+            }
+        };
+        ext = (ՐՏ_99 = fp.split("."))[ՐՏ_99.length-1];
+        return map_type[ext];
+    }
+    var ՐՏ_mod = ՐՏ_modules["ՐՏ:store.utils"];
+    ՐՏ_mod.export("map_ftype", function(){return map_ftype;}, function(ՐՏ_v){if (typeof map_ftype !== "undefined") {map_ftype = ՐՏ_v;};});
+    return ՐՏ_mod["exports"];
+};
+
 ՐՏ_modules["ՐՏ:store.editor"].body = function(){
     var __name__ = "store.editor";
 
@@ -6430,6 +6457,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
     var RS_store = ՐՏ_modules["asset.store3"].RS_store;
     var asyncer = ՐՏ_modules["asset.common"].asyncer;
     var cm_vuepy = ՐՏ_modules["asset.cm_vuepy"];var cm_rapydscript = ՐՏ_modules["asset.cm_rapydscript"];
+    var utils = ՐՏ_modules["store.utils"];
     function loadCSS(url) {
         return new Promise(function(resolve, reject) {
             var link, head;
@@ -6463,7 +6491,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
         css_themes: []
     };
     vc = new V_collector();
-    var Editor = (ՐՏ_99 = class Editor {
+    var Editor = (ՐՏ_100 = class Editor {
         constructor () {
             var self = this;
             self.inject = {
@@ -6586,7 +6614,9 @@ var ՐՏ_modules = ՐՏ_def_modules();
                     return cm;
                 }
             });
-            self.dispatch("set_theme", theme, win_id);
+            if (theme) {
+                self.dispatch("set_theme", theme, win_id);
+            }
             return cm;
         }
         set_win_props (win_id, payload) {
@@ -6789,7 +6819,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
             return self.dispatch("open_by_id", fid, self.get("active_window"));
         }
         open_by_id (fid, win_id, as_doc_num) {
-            var ՐՏ_100;
+            var ՐՏ_101;
             var self = this;
             var fs, info, content, doc_num;
             fs = self.api.fs;
@@ -6809,17 +6839,17 @@ var ՐՏ_modules = ՐՏ_def_modules();
                 info.change_gen = doc.changeGeneration();
             }
             if (as_doc_num) {
-                create_cm_doc(as_doc_num, content, self.map_ftype(info.name));
+                create_cm_doc(as_doc_num, content, utils.map_ftype(info.name));
                 doc_num = as_doc_num;
                 self.commit("set_doc_info", doc_num, info);
             } else {
                 doc_num = self.doc_num_by_fid(fid);
                 if (!doc_num) {
                     doc_num = self.commit("open", info);
-                    create_cm_doc(doc_num, content, self.map_ftype(info.name));
+                    create_cm_doc(doc_num, content, utils.map_ftype(info.name));
                 }
             }
-            if (win_id && (as_doc_num || ((ՐՏ_100 = self.get("windows")[win_id].doc_num) !== doc_num && (typeof ՐՏ_100 !== "object" || !ՐՏ_eq(ՐՏ_100, doc_num))))) {
+            if (win_id && (as_doc_num || ((ՐՏ_101 = self.get("windows")[win_id].doc_num) !== doc_num && (typeof ՐՏ_101 !== "object" || !ՐՏ_eq(ՐՏ_101, doc_num))))) {
                 self.cm_windows[win_id].swapDoc(self.cm_docs[doc_num]);
                 self.cm_windows[win_id].focus();
                 self.commit("swap_doc", doc_num, win_id);
@@ -6827,10 +6857,10 @@ var ՐՏ_modules = ՐՏ_def_modules();
             return doc_num;
         }
         $swap_doc (doc_num, win_id) {
-            var ՐՏ_101;
+            var ՐՏ_102;
             var self = this;
             win_id = win_id || self.get("active_window");
-            if (((ՐՏ_101 = self.get("windows")[win_id].doc_num) !== doc_num && (typeof ՐՏ_101 !== "object" || !ՐՏ_eq(ՐՏ_101, doc_num)))) {
+            if (((ՐՏ_102 = self.get("windows")[win_id].doc_num) !== doc_num && (typeof ՐՏ_102 !== "object" || !ՐՏ_eq(ՐՏ_102, doc_num)))) {
                 if (doc_num) {
                     self.cm_windows[win_id].swapDoc(self.cm_docs[doc_num]);
                     self.cm_windows[win_id].focus();
@@ -6870,7 +6900,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
             s = self.cm_docs[doc_num].getValue();
             finfo = self.get("doc_infos")[doc_num];
             fp = self.api.fs.path_by_id(finfo.id).path;
-            ftype = self.map_ftype(fp);
+            ftype = utils.map_ftype(fp);
             function post_proc(r) {
                 if (r.error) {
                     self.flash({
@@ -6883,7 +6913,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
             self.dispatch("$.compile", ftype, s, fp, compile_only).then(post_proc);
         }
         *set_theme (css_theme, win_id) {
-            var ՐՏitr62, ՐՏidx62, ՐՏ_102;
+            var ՐՏitr62, ՐՏidx62, ՐՏ_103;
             var self = this;
             var cur_theme, url, css, name;
             win_id = win_id || self.get("active_window");
@@ -6907,7 +6937,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
                 if (!/codemirror\/theme/.test(css.href)) {
                     continue;
                 }
-                name = (ՐՏ_102 = css.href.split("/"))[ՐՏ_102.length-1].slice(0, -4);
+                name = (ՐՏ_103 = css.href.split("/"))[ՐՏ_103.length-1].slice(0, -4);
                 if ((name === cur_theme || typeof name === "object" && ՐՏ_eq(name, cur_theme))) {
                     css.disabled = true;
                 }
@@ -6923,25 +6953,6 @@ var ՐՏ_modules = ՐՏ_def_modules();
             css_themes.push("default");
             win_id = self.get("active_window");
             self.commit("css_themes=", css_themes);
-        }
-        map_ftype (fp) {
-            var ՐՏ_103;
-            var self = this;
-            var map_type, ext;
-            map_type = {};
-            map_type["py"] = "python";
-            map_type["pyj"] = "rapydscript";
-            map_type["vuepy"] = "vuepy";
-            map_type["js"] = "javascript";
-            map_type["css"] = "css";
-            map_type["html"] = {
-                name: "htmlmixed",
-                tags: {
-                    script: [ [ "type", /^text\/(x-)?python$/, "text/x-python" ], [ null, null, "javascript" ] ]
-                }
-            };
-            ext = (ՐՏ_103 = fp.split("."))[ՐՏ_103.length-1];
-            return map_type[ext];
         }
         doc_num_by_fid (file_id) {
             var ՐՏitr63, ՐՏidx63, ՐՏ_104;
@@ -6974,155 +6985,155 @@ var ՐՏ_modules = ՐՏ_def_modules();
             return false;
         }
     }, (function(){
-        Object.defineProperties(ՐՏ_99.prototype, {
+        Object.defineProperties(ՐՏ_100.prototype, {
             mount_cm: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.mount_cm)
+                value: vc.action(ՐՏ_100.prototype.mount_cm)
             },
             set_win_props: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.set_win_props)
+                value: vc.mutation(ՐՏ_100.prototype.set_win_props)
             },
             add_window: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.add_window)
+                value: vc.mutation(ՐՏ_100.prototype.add_window)
             },
             set_active_window: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.set_active_window)
+                value: vc.mutation(ՐՏ_100.prototype.set_active_window)
             },
             open: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.open)
+                value: vc.mutation(ՐՏ_100.prototype.open)
             },
             set_doc_info: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.set_doc_info)
+                value: vc.mutation(ՐՏ_100.prototype.set_doc_info)
             },
             set_doc_change_gen: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.set_doc_change_gen)
+                value: vc.mutation(ՐՏ_100.prototype.set_doc_change_gen)
             },
             toggle_doc_saved: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.toggle_doc_saved)
+                value: vc.mutation(ՐՏ_100.prototype.toggle_doc_saved)
             },
             close: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.close)
+                value: vc.mutation(ՐՏ_100.prototype.close)
             },
             swap_doc: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.swap_doc)
+                value: vc.mutation(ՐՏ_100.prototype.swap_doc)
             },
             toggle_vim: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.toggle_vim)
+                value: vc.mutation(ՐՏ_100.prototype.toggle_vim)
             },
             set_error: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.set_error)
+                value: vc.mutation(ՐՏ_100.prototype.set_error)
             },
             clear_error: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.mutation(ՐՏ_99.prototype.clear_error)
+                value: vc.mutation(ՐՏ_100.prototype.clear_error)
             },
             active_doc_num: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.getter(ՐՏ_99.prototype.active_doc_num)
+                value: vc.getter(ՐՏ_100.prototype.active_doc_num)
             },
             trim_space: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.trim_space)
+                value: vc.action(ՐՏ_100.prototype.trim_space)
             },
             reload: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.reload)
+                value: vc.action(ՐՏ_100.prototype.reload)
             },
             save_all: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(asyncer(ՐՏ_99.prototype.save_all))
+                value: vc.action(asyncer(ՐՏ_100.prototype.save_all))
             },
             save: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(asyncer(ՐՏ_99.prototype.save))
+                value: vc.action(asyncer(ՐՏ_100.prototype.save))
             },
             close_all: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(asyncer(ՐՏ_99.prototype.close_all))
+                value: vc.action(asyncer(ՐՏ_100.prototype.close_all))
             },
             $close: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action("close")(asyncer(ՐՏ_99.prototype.$close))
+                value: vc.action("close")(asyncer(ՐՏ_100.prototype.$close))
             },
             $open: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action("open")(ՐՏ_99.prototype.$open)
+                value: vc.action("open")(ՐՏ_100.prototype.$open)
             },
             open_by_id_in_active_window: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.open_by_id_in_active_window)
+                value: vc.action(ՐՏ_100.prototype.open_by_id_in_active_window)
             },
             open_by_id: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.open_by_id)
+                value: vc.action(ՐՏ_100.prototype.open_by_id)
             },
             $swap_doc: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action("swap_doc")(ՐՏ_99.prototype.$swap_doc)
+                value: vc.action("swap_doc")(ՐՏ_100.prototype.$swap_doc)
             },
             $toggle_vim: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action("toggle_vim")(ՐՏ_99.prototype.$toggle_vim)
+                value: vc.action("toggle_vim")(ՐՏ_100.prototype.$toggle_vim)
             },
             set_cursor: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.set_cursor)
+                value: vc.action(ՐՏ_100.prototype.set_cursor)
             },
             compile_active_doc: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(ՐՏ_99.prototype.compile_active_doc)
+                value: vc.action(ՐՏ_100.prototype.compile_active_doc)
             },
             set_theme: {
                 enumerable: false, 
                 writable: true, 
-                value: vc.action(asyncer(ՐՏ_99.prototype.set_theme))
+                value: vc.action(asyncer(ՐՏ_100.prototype.set_theme))
             },
             load_theme_list: {
                 enumerable: false, 
                 writable: true, 
-                value: asyncer(ՐՏ_99.prototype.load_theme_list)
+                value: asyncer(ՐՏ_100.prototype.load_theme_list)
             }
         });
-        return ՐՏ_99;
-    })(), ՐՏ_99);
+        return ՐՏ_100;
+    })(), ՐՏ_100);
     store = new RS_store(EDITOR_DEFSTATE, vc, new Editor());
     if (__name__ === "__main__") {
     }
@@ -7138,6 +7149,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
     ՐՏ_mod.export("asyncer", function(){return asyncer;}, function(ՐՏ_v){if (typeof asyncer !== "undefined") {asyncer = ՐՏ_v;};});
     ՐՏ_mod.export("cm_vuepy", function(){return cm_vuepy;}, function(ՐՏ_v){if (typeof cm_vuepy !== "undefined") {cm_vuepy = ՐՏ_v;};});
     ՐՏ_mod.export("cm_rapydscript", function(){return cm_rapydscript;}, function(ՐՏ_v){if (typeof cm_rapydscript !== "undefined") {cm_rapydscript = ՐՏ_v;};});
+    ՐՏ_mod.export("utils", function(){return utils;}, function(ՐՏ_v){if (typeof utils !== "undefined") {utils = ՐՏ_v;};});
     return ՐՏ_mod["exports"];
 };
 
@@ -7606,6 +7618,9 @@ var ՐՏ_modules = ՐՏ_def_modules();
                 label: "Compile",
                 href: "#cmd:compile"
             }, {
+                label: "Compile Project",
+                href: "#cmd:compile_project"
+            }, {
                 label: "Editor",
                 subitems: [ {
                     label: "Close all",
@@ -7615,7 +7630,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
                     href: "#cmd:save_all_close"
                 } ]
             }, {
-                html: '<i title="reload current app into vue3pyj" class = "fa fa-sync" style = "color:#ecb700;"></i>',
+                html: '<i title="reload current app into PYJSAW" class = "fa fa-sync" style = "color:#ecb700;"></i>',
                 href: "#cmd:reload"
             }, {
                 slot: "search"
@@ -7666,7 +7681,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
     var FS = ՐՏ_modules["asset.fs"].FS;
     var vuepy_compile = ՐՏ_modules["asset.vuepy_compiler"].vuepy_compile;var rs_compile = ՐՏ_modules["asset.vuepy_compiler"].rs_compile;
     var vuepy_output = ՐՏ_modules["asset.vuepy_output"];
-    var editor = ՐՏ_modules["store.editor"];var explorer = ՐՏ_modules["store.explorer"];
+    var editor = ՐՏ_modules["store.editor"];var explorer = ՐՏ_modules["store.explorer"];var utils = ՐՏ_modules["store.utils"];
     var server = ՐՏ_modules["server"];
     var app_menu = ՐՏ_modules["app_menu"];
     var axios = ՐՏ_modules["axios"];
@@ -7801,7 +7816,7 @@ var ՐՏ_modules = ՐՏ_def_modules();
                 return self.local_setting;
             };
             self.output_path_map = path_map();
-            settings = window.localStorage.getItem("vue3pyj");
+            settings = window.localStorage.getItem("pyjsaw");
             self.local_setting = settings && JSON.parse(settings) || {};
             self.provide = (ՐՏ_109 = {
                 api: self.api,
@@ -7832,7 +7847,7 @@ Object.defineProperties(ՐՏ_109, {
         save_local (prop, value) {
             var self = this;
             self.local_setting[prop] = value;
-            window.localStorage.setItem("vue3pyj", JSON.stringify(self.local_setting));
+            window.localStorage.setItem("pyjsaw", JSON.stringify(self.local_setting));
         }
         on_server (a) {
             var self = this;
@@ -8090,6 +8105,8 @@ Object.defineProperties(ՐՏ_109, {
                 if (adoc_num) {
                     self.dispatch("/editor.compile_active_doc");
                 }
+            } else if (cmd === "compile_project") {
+                self.dispatch("compile_project");
             } else if (cmd === "save") {
                 if (adoc_num) {
                     self.dispatch("/editor.save", adoc_num);
@@ -8208,6 +8225,49 @@ Object.defineProperties(ՐՏ_109, {
                 throw err;
             }
             return code;
+        }
+        *compile_project () {
+            var ՐՏitr75, ՐՏidx75;
+            var self = this;
+            var fs, project_fid, project_content, f, files, fp, fid, s, ftype, r;
+            fs = self.api.fs;
+            project_fid = fs.id_by_path("/vuepy/vuepy.prj");
+            if (!project_fid) {
+                self.$flash("vuepy.prj not found", "error");
+                return;
+            }
+            project_content = fs.files[project_fid].content;
+            files = (function() {
+                var ՐՏidx74, ՐՏitr74 = ՐՏ_Iterable(project_content.split("\n")), ՐՏres = [], f;
+                for (ՐՏidx74 = 0; ՐՏidx74 < ՐՏitr74.length; ՐՏidx74++) {
+                    f = ՐՏitr74[ՐՏidx74];
+                    ՐՏres.push(f.trim());
+                }
+                return ՐՏres;
+            })();
+            ՐՏitr75 = ՐՏ_Iterable(files);
+            for (ՐՏidx75 = 0; ՐՏidx75 < ՐՏitr75.length; ՐՏidx75++) {
+                fp = ՐՏitr75[ՐՏidx75];
+                if (!fp) {
+                    continue;
+                }
+                fp = `/vuepy/${fp}`;
+                fid = fs.id_by_path(fp);
+                if (!fid) {
+                    self.$flash(`${fp} not found`, "error");
+                    return;
+                }
+                s = fs.files[fid].content;
+                ftype = utils.map_ftype(fp);
+                r = yield self.dispatch("compile", ftype, s, fp);
+                if (r.error) {
+                    self.$flash({
+                        component: "XError"
+                    }, "error");
+                    return;
+                }
+            }
+            self.$flash("ok", "ok");
         }
         *compile (compiler, s, fp, compile_only) {
             var self = this;
@@ -8405,6 +8465,11 @@ Object.defineProperties(ՐՏ_109, {
                 writable: true, 
                 value: asyncer(ՐՏ_108.prototype.compile_py)
             },
+            compile_project: {
+                enumerable: false, 
+                writable: true, 
+                value: vc.action(asyncer(ՐՏ_108.prototype.compile_project))
+            },
             compile: {
                 enumerable: false, 
                 writable: true, 
@@ -8432,6 +8497,7 @@ Object.defineProperties(ՐՏ_109, {
     ՐՏ_mod.export("vuepy_output", function(){return vuepy_output;}, function(ՐՏ_v){if (typeof vuepy_output !== "undefined") {vuepy_output = ՐՏ_v;};});
     ՐՏ_mod.export("editor", function(){return editor;}, function(ՐՏ_v){if (typeof editor !== "undefined") {editor = ՐՏ_v;};});
     ՐՏ_mod.export("explorer", function(){return explorer;}, function(ՐՏ_v){if (typeof explorer !== "undefined") {explorer = ՐՏ_v;};});
+    ՐՏ_mod.export("utils", function(){return utils;}, function(ՐՏ_v){if (typeof utils !== "undefined") {utils = ՐՏ_v;};});
     ՐՏ_mod.export("server", function(){return server;}, function(ՐՏ_v){if (typeof server !== "undefined") {server = ՐՏ_v;};});
     ՐՏ_mod.export("app_menu", function(){return app_menu;}, function(ՐՏ_v){if (typeof app_menu !== "undefined") {app_menu = ՐՏ_v;};});
     ՐՏ_mod.export("axios", function(){return axios;}, function(ՐՏ_v){if (typeof axios !== "undefined") {axios = ՐՏ_v;};});
@@ -8443,6 +8509,7 @@ Object.defineProperties(ՐՏ_109, {
 ՐՏ_modules["ՐՏ:store"].body = function(){
     var __name__ = "store";
 
+    ՐՏ_modules["ՐՏ:store"].export("utils", function(){return ՐՏ_modules["store.utils"];}, function(){throw new Error("use Object.defineProperty!");});
     ՐՏ_modules["ՐՏ:store"].export("editor", function(){return ՐՏ_modules["store.editor"];}, function(){throw new Error("use Object.defineProperty!");});
     ՐՏ_modules["ՐՏ:store"].export("explorer", function(){return ՐՏ_modules["store.explorer"];}, function(){throw new Error("use Object.defineProperty!");});
     ՐՏ_modules["ՐՏ:store"].export("root", function(){return ՐՏ_modules["store.root"];}, function(){throw new Error("use Object.defineProperty!");});
@@ -8464,11 +8531,11 @@ Object.defineProperties(ՐՏ_109, {
     var make_store = ՐՏ_modules["store.root"].make;
     Vue.directive("blurClick", click_out.opt);
     function reg_components() {
-        var ՐՏitr74, ՐՏidx74;
+        var ՐՏitr76, ՐՏidx76;
         var cname, c;
-        ՐՏitr74 = ՐՏ_Iterable(components);
-        for (ՐՏidx74 = 0; ՐՏidx74 < ՐՏitr74.length; ՐՏidx74++) {
-            cname = ՐՏitr74[ՐՏidx74];
+        ՐՏitr76 = ՐՏ_Iterable(components);
+        for (ՐՏidx76 = 0; ՐՏidx76 < ՐՏitr76.length; ՐՏidx76++) {
+            cname = ՐՏitr76[ՐՏidx76];
             c = components[cname].make();
             Vue.component(c.name, c);
         }
@@ -8619,12 +8686,12 @@ Object.defineProperties(ՐՏ_109, {
         return map[mod_name] || mod_name;
     });
     define([ "amd" ].concat(deps_keys_mapped), function(amd) {
-        var ՐՏitr75, ՐՏidx75;
+        var ՐՏitr77, ՐՏidx77;
         var args = [].slice.call(arguments, 1);
         var i, dep_key, params;
-        ՐՏitr75 = ՐՏ_Iterable(enumerate(deps_keys));
-        for (ՐՏidx75 = 0; ՐՏidx75 < ՐՏitr75.length; ՐՏidx75++) {
-            [i, dep_key] = ՐՏitr75[ՐՏidx75];
+        ՐՏitr77 = ՐՏ_Iterable(enumerate(deps_keys));
+        for (ՐՏidx77 = 0; ՐՏidx77 < ՐՏitr77.length; ՐՏidx77++) {
+            [i, dep_key] = ՐՏitr77[ՐՏidx77];
             mechanic.module_spec(dep_key).exports = args[i];
         }
         params = document.getElementsByTagName("meta")[0].dataset;

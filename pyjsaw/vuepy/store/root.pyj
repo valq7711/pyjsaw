@@ -4,7 +4,7 @@ from asset.common import asyncer
 from asset.fs import FS
 from asset.vuepy_compiler import vuepy_compile, rs_compile
 import asset.vuepy_output as vuepy_output
-import .editor, .explorer
+import .editor, .explorer, .utils
 import server
 import app_menu
 async import axios
@@ -126,7 +126,7 @@ class Root:
         # output for compile
         self.output_path_map = path_map()
 
-        settings = window.localStorage.getItem('vue3pyj')
+        settings = window.localStorage.getItem('pyjsaw')
         self.local_setting =  settings and JSON.parse(settings) or {}
 
         #----------- provide ----------
@@ -141,7 +141,7 @@ class Root:
 
     def save_local(self, prop, value):
         self.local_setting[prop] = value
-        window.localStorage.setItem('vue3pyj', JSON.stringify(self.local_setting))
+        window.localStorage.setItem('pyjsaw', JSON.stringify(self.local_setting))
 
     # server events
     def on_server(self, a):
@@ -360,6 +360,8 @@ class Root:
         elif cmd is 'compile':
             if adoc_num:
                 self.dispatch('/editor.compile_active_doc')
+        elif cmd is 'compile_project':
+            self.dispatch('compile_project')
         elif cmd is 'save':
             if adoc_num:
                 self.dispatch('/editor.save', adoc_num)
@@ -460,6 +462,33 @@ class Root:
             err.filename = fp
             raise err
         return code
+
+    @vc.action
+    @asyncer
+    def compile_project(self):
+        fs = self.api.fs
+        project_fid = fs.id_by_path('/vuepy/vuepy.prj')
+        if not project_fid:
+            self.$flash('vuepy.prj not found', 'error')
+            return
+        project_content = fs.files[project_fid].content
+        files = [f.trim() for f in project_content.split('\n')]
+        for fp in files:
+            if not fp:
+                continue
+            fp = f'/vuepy/${fp}'
+            fid = fs.id_by_path(fp)
+            if not fid:
+                self.$flash(f'${fp} not found', 'error')
+                return
+            s = fs.files[fid].content
+            ftype = utils.map_ftype(fp)
+            r = yield self.dispatch('compile', ftype, s, fp)
+            if r.error:
+                self.$flash({component: 'XError'}, 'error')
+                return
+        self.$flash('ok', 'ok')
+
 
     @vc.action
     @asyncer

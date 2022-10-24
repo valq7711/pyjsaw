@@ -3,6 +3,8 @@ from asset.store3 import RS_store
 from asset.common import asyncer
 from asset import cm_vuepy, cm_rapydscript
 
+import .utils
+
 
 
 def loadCSS(url):
@@ -127,7 +129,8 @@ class Editor:
         opt = Object.assign(def_opt, opt or {})
         cm = self.cm_windows[win_id] = self.api.CM(el , opt)
         self.commit('add_window', win_id, {get_cm: def(): return cm;})
-        self.dispatch('set_theme', theme, win_id)
+        if theme:
+            self.dispatch('set_theme', theme, win_id)
         return cm
 
     @vc.mutation
@@ -312,14 +315,14 @@ class Editor:
             info.change_gen = doc.changeGeneration()
 
         if as_doc_num:
-            create_cm_doc(as_doc_num, content, self.map_ftype(info.name))
+            create_cm_doc(as_doc_num, content, utils.map_ftype(info.name))
             doc_num = as_doc_num
             self.commit('set_doc_info', doc_num, info)
         else:
             doc_num = self.doc_num_by_fid(fid)
             if not doc_num:
                 doc_num = self.commit('open', info)
-                create_cm_doc(doc_num, content, self.map_ftype(info.name))
+                create_cm_doc(doc_num, content, utils.map_ftype(info.name))
         if win_id and \
                 (as_doc_num or self.get('windows')[win_id].doc_num != doc_num):
             self.cm_windows[win_id].swapDoc(self.cm_docs[doc_num])
@@ -359,7 +362,7 @@ class Editor:
         s = self.cm_docs[doc_num].getValue()
         finfo = self.get('doc_infos')[doc_num]
         fp = self.api.fs.path_by_id(finfo.id).path
-        ftype = self.map_ftype(fp)
+        ftype = utils.map_ftype(fp)
         def post_proc(r):
             if r.error:
                 self.flash({component: 'XError'}, 'error')
@@ -399,24 +402,6 @@ class Editor:
         self.commit('css_themes=', css_themes)
 
     #--------- utils -------------
-    def map_ftype(self, fp):
-        map_type  = {}
-        map_type['py'] = 'python'
-        map_type['pyj'] = 'rapydscript'
-        map_type['vuepy'] = 'vuepy'
-        map_type['js'] = 'javascript'
-        map_type['css'] = 'css'
-        map_type['html'] = {
-            name: 'htmlmixed',
-            tags: {
-                script: [["type", /^text\/(x-)?python$/, "text/x-python"],
-                [None, None, "javascript"]]
-            }
-        }
-        ext = fp.split('.')[-1]
-        return map_type[ext]
-
-
 
     def doc_num_by_fid(self, file_id):
         if not file_id:
