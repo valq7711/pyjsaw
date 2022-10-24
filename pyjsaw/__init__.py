@@ -8,7 +8,7 @@ from .fs2json import FS2Json
 from . import utemplates as ut
 
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __static_version__ = '1.0.4'
 
 fs2json = FS2Json()
