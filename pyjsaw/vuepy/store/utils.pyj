@@ -1,0 +1,17 @@
+
+def map_ftype(fp):
+    map_type  = {}
+    map_type['py'] = 'python'
+    map_type['pyj'] = 'rapydscript'
+    map_type['vuepy'] = 'vuepy'
+    map_type['js'] = 'javascript'
+    map_type['css'] = 'css'
+    map_type['html'] = {
+        name: 'htmlmixed',
+        tags: {
+            script: [["type", /^text\/(x-)?python$/, "text/x-python"],
+            [None, None, "javascript"]]
+        }
+    }
+    ext = fp.split('.')[-1]
+    return map_type[ext]

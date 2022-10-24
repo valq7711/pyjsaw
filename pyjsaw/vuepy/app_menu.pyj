@@ -11,11 +11,12 @@ def get_menu(web23py):
             {html: {template: '<button class = "button metalic-btn">{{$store.state.w23p_app}}</button>'}, href: '#cmd:toggle_explorer'},
             {label: 'Save', href: '#cmd:save' },
             {label: 'Compile', href: '#cmd:compile'},
+            {label: 'Compile Project', href: '#cmd:compile_project'},
             {label: 'Editor',subitems: [
                 {label: 'Close all', href: '#cmd:close_all'},
                 {label: 'Save all & close', href: '#cmd:save_all_close'},
             ]},
-            {html: '<i title="reload current app into vue3pyj" class = "fa fa-sync" style = "color:#ecb700;"></i>', href: '#cmd:reload'},
+            {html: '<i title="reload current app into PYJSAW" class = "fa fa-sync" style = "color:#ecb700;"></i>', href: '#cmd:reload'},
             {slot: 'search'},
             {slot: 'theme'},
         ],

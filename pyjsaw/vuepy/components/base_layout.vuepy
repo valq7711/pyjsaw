@@ -9,10 +9,10 @@ v-def templ:
             :menus= 'menus',
         ):
             T(v-slot:brand): NavbarItem: img(
-                :src="$root.v3p_static + '/vue3pyj_logo.png'",
+                :src="$root.v3p_static + '/pyjsaw_logo.png'",
                 class = 'metalic-btn',
                 style= 'border-radius:6px; padding:3px',
-                alt="vue3pyj"
+                alt="PYJSAW"
             ):
                 #div( v-for = "clr, cidx in ['#42b983', '#3a76ac', '#dcb946', '#bb0000']",
                 #    style = 'display:inline-block;height:50px;',

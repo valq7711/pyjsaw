@@ -5,9 +5,10 @@ from websaw.core import Fixture, Reloader
 from websaw.core.core_events import CoreEvents, core_event_bus
 from pydal.validators import CRYPT
 from .fs2json import FS2Json
+from . import utemplates as ut
 
 
-__version__ = '0.0.2'
+__version__ = '0.0.4'
 __static_version__ = '1.0.4'
 
 fs2json = FS2Json()
@@ -54,11 +55,11 @@ def logout(ctx: Context):
 
 
 @app.route('index')
-@app.use('index.html')
+@app.use(ut.index)
 def index(ctx: Context):
     return dict(
         web23py='web3py',
-        title='Vue3pyj',
+        title='PYJSAW',
         static_version='',
         app_root=ctx.get('base_url')
     )
