@@ -23,6 +23,9 @@ class Scope:
     def on_directive(self, name: str, value):
         pass
 
+    def on_method(self, meth_def):
+        pass
+
 
 class Bookmark:
     def __init__(self, buf: 'Buffer', idx: int):
@@ -109,6 +112,10 @@ class Stream:
             for ns in reversed(self.ns_stack):
                 if ns.on_directive(name, value) is not Scope.BUBBLE:
                     break
+
+    def emit_method(self, meth_def):
+        cls_def = self.ns_stack[-1]
+        cls_def.on_method(meth_def)
 
     def push_node(self, node):
         self.node_stack.append(node)

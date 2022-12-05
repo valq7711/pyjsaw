@@ -1,7 +1,9 @@
 from typing import TypeVar, Generic, List as tpList, Union, Any, Optional, Mapping
+import typing
 import sys
 import ast
 from ast import iter_fields, AST, Load, Store, Del
+
 from pyjsaw.stream import Stream, Scope, PREFIX
 
 
@@ -358,6 +360,14 @@ class ImportFrom(RSNode[ast.ImportFrom]):
         return ret
 
 
+class expr(RSNode[ast.expr]):
+    pass
+
+
+class expr_context(RSNode[ast.AST]):
+    pass
+
+
 class Name(RSNode[ast.Name]):
     id: str = NodeAttr()
     ctx: Union[Load, Del, Store] = NodeAttr()
@@ -375,8 +385,21 @@ class Name(RSNode[ast.Name]):
         return self.id
 
 
-class expr(RSNode[ast.expr]):
-    pass
+class Attribute(RSNode[ast.Attribute]):
+    value: expr = NodeAttr()
+    attr: str = NodeAttr()
+    ctx: expr_context = NodeAttr()
+    is_directive = False
+
+    def created(self):
+        if isinstance(self.value, Name) and self.value.id == '__RSDirectives__':
+            self.is_directive = True
+
+    def _print(self):
+        out = self._output
+        self.value.print(out)
+        out.print_('.')
+        out.print_(self.attr)
 
 
 class Expr(RSNode[ast.Expr]):
@@ -948,7 +971,10 @@ class arguments(RSNode[ast.AST]):
     kwarg: Optional[arg] = NodeAttr()
     defaults: tpList[expr] = NodeAttr()
 
+    all_args: tpList[arg]
+
     def _print(self):
+        all_args = self.all_args = []
         out = self._output
         defs = self.defaults or []
         def_idx = len(defs) - len(self.args)
@@ -959,6 +985,8 @@ class arguments(RSNode[ast.AST]):
             def_idx += 1
             pos_args.append(pos_arg)
         out.sequence(*pos_args)
+        all_args.extend(pos_args)
+
         kw = self.kwonlyargs
         if kw:
             if self.vararg:
@@ -975,6 +1003,7 @@ class arguments(RSNode[ast.AST]):
             with out.in_braces():
                 out.sequence(*kw_args)
             out.print_('={}')
+            all_args.extend(kw_args)
 
 
 class BaseFunctionDef(expr):
@@ -1041,7 +1070,6 @@ class FunctionDef(BaseFunctionDef, Scope):
     returns: Optional[expr] = NodeAttr()
 
     kind = 'function'
-    _name: Name = None
     no_locals = False
 
     # Scope stuff
@@ -1049,14 +1077,25 @@ class FunctionDef(BaseFunctionDef, Scope):
 
     vars: Mapping[str, bool]
 
+    # class stuff
+    has_self_arg = True
+    static = False
+    classmeth = False
+
+    @property
+    def _name(self):
+        return Name(None, id=self.name, ctx=Load())
+
     def on_assign(self, var: Entity):
-        if self.no_locals and not var.name.startswith(PREFIX):
+        var_name = var.name
+        if self.no_locals and not var_name.startswith(PREFIX):
             return Scope.BUBBLE
-        if var.name not in self.nonlocals and not var.kind:
-            self.vars[var.name] = True
+
+        if var_name not in self.nonlocals and var_name not in self.vars and not var.kind:
+            self.vars[var_name] = True
 
     def on_yield(self):
-        if isinstance(self, JSDescriptor):
+        if self.kind in ['get', 'set']:
             raise SyntaxError(f'JS descriptor can`t be generator: {self.name}')
         self.is_generator = True
 
@@ -1067,55 +1106,60 @@ class FunctionDef(BaseFunctionDef, Scope):
         with out.as_statement():
             out.print_('var')
             out.space()
-            out.sequence(*self.vars)
+            out.sequence(*[name for name, v in self.vars.items() if v])
 
-    def created(self):
-        if self.decorator_list:
-            decorator_list = [*self.decorator_list]
-            prop_dec = None
-            static_dec = None
-            classmeth_dec = None
-            for dec in self.decorator_list:
-                pop_dec = False
-                if isinstance(dec, Name):
-                    if dec.id == 'property':
-                        prop_dec = dec
-                        pop_dec = True
-                    elif dec.id == 'staticmethod':
-                        static_dec = dec
-                        pop_dec = True
-                    elif dec.id == 'classmethod':
-                        classmeth_dec = dec
-                        pop_dec = True
-                elif isinstance(dec, Attribute) and dec.attr == 'setter':
-                    assert isinstance(dec.value, Name)
-                    prop_dec = Name(dec._pynode, id=dec.value.id)
-                    pop_dec = True
+    def _split_decorators(self) -> typing.Tuple[tpList[expr], typing.Dict[str, str]]:
+        if not self.decorator_list:
+            return [None, None]
+        spec = {}
+        regular = []
+        for dec in self.decorator_list:
+            if isinstance(dec, Name):
+                if dec.id in ['property', 'staticmethod', 'classmethod']:
+                    spec[dec.id] = True
+                    continue
+            elif isinstance(dec, Attribute) and dec.attr == 'setter':
+                assert isinstance(dec.value, Name)
+                spec['setter'] = dec.value.id
+                continue
 
-                if pop_dec:
-                    decorator_list.pop(decorator_list.index(dec))
+            regular.append(dec)
+        return regular, spec
 
-            if prop_dec or static_dec or classmeth_dec:
-                if static_dec and classmeth_dec:
-                    raise SyntaxError('Special decorators conflict: staticmethod & classmethod')
-                if prop_dec:
-                    cls = Getter if prop_dec.id == 'property' else Setter
-                else:
-                    cls = JSMethod
-                static = static_dec is not None
-                ret = cls.from_func_def(
-                    self,
-                    decorator_list=decorator_list,
-                    static=static,
-                    classmeth=classmeth_dec is not None,
-                    has_self_arg=not static
-                )
-                return ret
-
-        super().created()
+    def _process_class_method(self):
         if self.name == '__init__':
             self.name = 'constructor'
-        self._name = Name(None, id=self.name, ctx=Load())
+        self.kind = ''
+        regular, spec = self._split_decorators()
+        if spec:
+            self.static = spec.pop('staticmethod', False)
+            self.classmeth = spec.pop('classmethod', False)
+            if self.static and self.classmeth:
+                raise SyntaxError('Special decorators conflict: staticmethod & classmethod')
+
+            getter = spec.pop('property', False)
+            setter = spec.pop('setter', False)
+            if getter or setter:
+                if getter and setter:
+                    raise SyntaxError('Special decorators conflict: property & setter')
+                if setter:
+                    self.name = setter
+                    self.kind = 'set'
+                else:
+                    self.kind = 'get'
+            self.decorator_list = regular
+
+        if not self.static and self.has_self_arg:
+            if not self.args.args:
+                raise SyntaxError('At least one arg required (self)')
+            self_arg = self.args.args.pop(0)
+            self_name = Name(None, id=self_arg.arg)
+            this_name = Name(None, id='this')
+            self_assign = Assign(None, targets=[self_name], value=this_name)
+            self.body.insert(0, self_assign)
+
+    def _print(self):
+
         self.nonlocals = {}
         cnt = 0
         for i, st in enumerate(self.body):
@@ -1125,22 +1169,25 @@ class FunctionDef(BaseFunctionDef, Scope):
                     raise SyntaxError('nonlocal/global must be first statements')
                 cnt += 1
 
-    def morph(self):
         out = self._output
         p = out.parent()
-        if isinstance(p, ClassDef):
-            js_meth = JSMethod.from_func_def(self)
-            return js_meth
+        in_class = isinstance(p, ClassDef)
+        if in_class:
+            self._process_class_method()
+            if self.static or self.classmeth:
+                out.print_('static')
+                out.space()
 
-    def _print(self):
-        out = self._output
         self._print_def()
         if self.decorator_list:
-            dec_expr = DecoratedExpr(self._name, self.decorator_list)
-            out.end_statement()
-            out.indent()
-            out.assign_vars(self.name)
-            dec_expr.print(out)
+            if in_class:
+                out.emit_method(self)
+            else:
+                dec_expr = DecoratedExpr(self._name, self.decorator_list)
+                out.end_statement()
+                out.indent()
+                out.assign_vars(self.name)
+                dec_expr.print(out)
 
     def _print_def(self):
         out = self._output
@@ -1154,8 +1201,11 @@ class FunctionDef(BaseFunctionDef, Scope):
             if self.args:
                 self.args.print(out)
 
-        with out.in_block(scope=self):
+        if self.args:
+            self.vars = {a.arg: False for a in self.args.all_args}
+        else:
             self.vars = {}
+        with out.in_block(scope=self):
             with out.start_local_buffer(self._print_vars):
                 # `(a,b,c, *args`) -> var args = [...arguments].slice(3)
                 if self.args and self.args.vararg:
@@ -1192,8 +1242,6 @@ class YieldFrom(RSNode[ast.YieldFrom]):
         return Yield(self._pynode, value=self.value, is_yield_from=True)
 
 
-class expr_context(RSNode[ast.AST]):
-    pass
 
 class Tuple(RSNode[ast.Tuple]):
     elts: tpList[expr] = NodeAttr()
@@ -1274,22 +1322,6 @@ class Slice(RSNode[ast.Slice]):
         with out.in_parens():
             out.sequence(self.lower, self.upper)
 
-
-class Attribute(RSNode[ast.Attribute]):
-    value: expr = NodeAttr()
-    attr: str = NodeAttr()
-    ctx: expr_context = NodeAttr()
-    is_directive = False
-
-    def created(self):
-        if isinstance(self.value, Name) and self.value.id == '__RSDirectives__':
-            self.is_directive = True
-
-    def _print(self):
-        out = self._output
-        self.value.print(out)
-        out.print_('.')
-        out.print_(self.attr)
 
 
 class Subscript(RSNode[ast.Subscript]):
@@ -1617,57 +1649,6 @@ class JoinedStr(RSNode[ast.JoinedStr]):
         out.print_('`')
 
 
-class JSMethod(FunctionDef):
-    kind = ''  # no `function` before method name
-    has_self_arg = True
-    static = False
-    classmeth = False
-
-    def morph(self):
-        pass
-
-    @classmethod
-    def from_func_def(cls, func_def: FunctionDef, **kw):
-        attrs = {k: getattr(func_def, k) for k in FunctionDef.__node_attrs_map__.values()}
-        attrs.update(kw)
-        return cls(
-            func_def._pynode,
-            **attrs
-        )
-
-    def created(self):
-        super().created()
-        if self.has_self_arg:
-            if not self.args.args:
-                raise SyntaxError('At least one arg required (self)')
-            self_arg = self.args.args.pop(0)
-            self_name = Name(None, id=self_arg.arg)
-            this_name = Name(None, id='this')
-            self_assign = Assign(None, targets=[self_name], value=this_name)
-            self.body.insert(0, self_assign)
-
-    def _print(self):
-        # In fact, in JS any static method is classmethod, as it gets this==class.
-        # So in our case classmethod should have fake first arg (e.g. `cls` with auto assignment `cls = this`)
-        # and it is not exposed at instance level to force user to call it
-        # with class context as `self.__class__.some()`
-        if self.static or self.classmeth:
-            out = self._output
-            out.print_('static')
-            out.space()
-        self._print_def()
-
-
-class JSDescriptor(JSMethod):
-    pass
-
-class Getter(JSDescriptor):
-    kind = 'get'
-
-class Setter(JSDescriptor):
-    kind = 'set'
-
-
 class ClassDef(RSNode[ast.ClassDef], Scope):
     name: str = NodeAttr()
     bases: tpList[expr] = NodeAttr()
@@ -1675,7 +1656,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
     body: tpList[stmt] = NodeAttr()
     decorator_list: tpList[expr] = NodeAttr()
 
-    methods: tpList[Union[FunctionDef, JSMethod]]
+    methods: tpList[FunctionDef]
     class_attrs: tpList[Assign]
 
     _in_postproc = False
@@ -1701,8 +1682,9 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         getter_name = getter_name or a
         assert getter_name
         value = self._this_constructor_attr(a) if a else self._this_constructor()
-        getter = Getter(
+        getter = FunctionDef(
             None,
+            decorator_list=[Name(None, id='property')],
             has_self_arg=False,
             name=getter_name,
             body=[Return(None, value=value)]
@@ -1720,8 +1702,9 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
             func=Name(None, id='Object.defineProperty'),
             args=args
         )
-        setter = Setter(
+        setter = FunctionDef(
             None,
+            decorator_list=[Attribute(None, value=Name(None, id=a), attr='setter')],
             has_self_arg=False,
             args=arguments(None, args=[arg(None, arg='v')]),
             name=a,
@@ -1733,6 +1716,9 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         super().created()
         class_getter = self._inst_class_attr_getter('', '__class__')
         self.body.insert(0, class_getter)
+
+    def on_method(self, meth_def):
+        pass
 
     def _print(self):
         self._in_postproc = False
@@ -1753,7 +1739,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
                     self.methods.append(st)
                     with out.as_statement():
                         st.print(out)
-                    if isinstance(st, JSMethod) and st.static:
+                    if st.static:
                         self.class_attrs.append(st._name)
             self._print_footer()
         out.end_statement()
@@ -1783,7 +1769,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
                 continue
             kind = Constant(None, value=m.kind)
             dec_expr = DecoratedExpr(Name(None, id='func'), m.decorator_list)
-            static = m.static or m.classmeth if isinstance(m, JSMethod) else False
+            static = m.static or m.classmeth
             params.append([static, m.name, m.kind, m.decorator_list])
         if params:
             self_proto = f'{self.name}.prototype'
