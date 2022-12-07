@@ -141,18 +141,15 @@ class Module:
         baselib = self._baselib_mod
         output.print_stmt(f'{PREFIX}_defmod("{baselib.mod_id}")')
         output.print_(baselib.output)
-        output.newline()
+        output.end_statement()
 
-        # print baselib's imports
-        # baselib.foo -> RS_foo
-        # trailing underscores will be removed, e.g.:
-        #   baselib.in_ -> RS_in
         names = [
             alias(None, name=imp, asname=asname)
             for imp, asname in self.baselib_imports.items()
         ]
-        baselib_imp = Import(None, from_module='baselib', names=names, no_emits=True)
-        output.print_stmt(baselib_imp)
+        if names:
+            baselib_imp = Import(None, from_module='baselib', names=names, no_emits=True)
+            output.print_stmt(baselib_imp)
 
     def compile(self, only_body=False):
         src = self.fp.read_text()

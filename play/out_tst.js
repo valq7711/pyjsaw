@@ -135,8 +135,7 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
     var ϟ_mod = ϟ_modules["ϟ:baselib"];
     Object.assign(ϟ_modules["ϟ:baselib"].exports, {__name__, STR_CTR, ARR_CTR, SET_CTR, is_in, iterable, len, isstr, max, min, reversed, sorted, hasattr, dir, decor});
     return ϟ_mod;
-}
-;
+};
 
 
 (function (){
