@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Union
 from pathlib import Path
 import ast
 from ast import AST
@@ -77,6 +77,7 @@ class Module:
         self.from_baselib_import = {}
         self.baselib_imports: Dict[str, bool] = {}
         self.embed_ctx = embed_ctx or {}
+        self.is_typing = False
 
         self._baselib_mod = None
         if not top_level:
@@ -91,6 +92,20 @@ class Module:
     def top_level(self):
         return self._top_level or self
 
+    def get_obj(self, imp_id: str):
+        *mod_id, exp = imp_id.split('.')
+        mod_id = '.'.join(mod_id)
+        if mod_id:
+            mod = self.top_level.all_modules[mod_id]
+            return mod.exports.get(exp, self.top_level.all_modules.get(imp_id))
+        return self.top_level.all_modules.get(imp_id)
+
+    def get_attr(self, a: str):
+        ret = self.exports.get(a)
+        if ret is None:
+            ret = self.top_level.all_modules.get(f'{self.mod_id}.{a}')
+        return ret
+
     def get_embed(self, key: str):
         if key in self.embed_ctx:
             return self.embed_ctx[key]
@@ -100,10 +115,18 @@ class Module:
     def set_exports(self, exp):
         self.exports = exp
 
+    def is_typing_module(self, imp_pth: str):
+        for mod_id in imp_pth.split('.'):
+            mod = self.top_level.all_modules.get(mod_id)
+            if not mod:
+                break
+            elif mod.is_typing:
+                return True
+
     def print_baselib(self, output: Stream):
 
         # print def_modules
-        def_modules = Module(Path(__file__).parent / 'def_modules.py')
+        def_modules = Module(Path(__file__).parent / 'def_modules.py', None, self)
         def_modules.compile(only_body=True)
         output.print_(
             def_modules.output.replace('{PREFIX}', PREFIX).replace('__def_modules__', f'{PREFIX}_def_modules')
@@ -116,6 +139,7 @@ class Module:
 
         # print baselib
         baselib = self._baselib_mod
+        output.print_stmt(f'{PREFIX}_defmod("{baselib.mod_id}")')
         output.print_(baselib.output)
         output.newline()
 
@@ -147,16 +171,17 @@ class Module:
         if self.top_level is self:
             self.print_baselib(stream)
             stream.newline()
-            for mod_id, mod_obj in self.all_modules.items():
+            printable_modules = {k: m for k, m in self.all_modules.items() if not m.is_typing}
+            for mod_id, mod_obj in printable_modules.items():
                 stream.print_stmt(f'{PREFIX}_defmod("{mod_id}")')
 
             # define subs
-            for mod_id, mod_obj in self.all_modules.items():
+            for mod_id, mod_obj in printable_modules.items():
                 for sub in mod_obj.subs:
                     stream.print_stmt(
                         f'{PREFIX}_modules["{PREFIX}:{mod_id}"].export("{sub}", "{mod_id}.{sub}")'
                     )
-            stream.sequence(*[m.output for m in self.all_modules.values()], sep='\n\n')
+            stream.sequence(*[m.output for m in printable_modules.values()], sep='\n\n')
             stream.newline()
             stream.print_(self.output)
             self.output = stream.get()
@@ -219,15 +244,10 @@ class Module:
             pkg_mod.subs[mod_id.split('.')[-1]] = True
 
 
-mod_fp = (Path(__file__).parent / 'for_ast.py')
-
-mod = Module(mod_fp, embed_ctx={'templ': "'qq jamba'"})
-
-mod.compile()
-
-print(mod.wrapped())
-
-#print(ast.dump(mast, indent=2))
-
-
-
+def compile(fp: Union[Path, str]):
+    if isinstance(fp, str):
+        fp = Path(fp)
+    main = Module(fp, embed_ctx={})
+    main.compile()
+    out = main.wrapped()
+    return out

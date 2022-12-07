@@ -4,7 +4,7 @@ from js_obj import Object, Array, this
 def __def_modules__():
     modules = {}
 
-    def export(prop, get, set):
+    def set_export(prop, get, set):
         rs_mod = this
         if Array.isArray(prop):
             f"{'for(args of prop){rs_mod.export(...args)}'}"
@@ -29,7 +29,7 @@ def __def_modules__():
             "exports": {},
             "{PREFIX}_invoked": False,
         }
-        rs_mod["export"] = export
+        rs_mod["export"] = set_export
 
         def getter():
             # module getter
@@ -37,7 +37,7 @@ def __def_modules__():
             if mod["{PREFIX}_invoked"]:
                 return mod["exports"]
             mod["{PREFIX}_invoked"] = True
-            return mod["{PREFIX}_body"]()
+            return mod["{PREFIX}_body"]()["exports"]
 
         def setter(v):
             modules[rs_mod_id]["exports"] = v

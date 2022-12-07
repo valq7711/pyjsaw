@@ -5,7 +5,7 @@ import re
 
 Error = RuntimeError
 
-PREFIX = 'δ'
+PREFIX = 'ϟ'
 
 def _noop():
     pass
@@ -24,6 +24,9 @@ class Scope:
         pass
 
     def on_method(self, meth_def):
+        pass
+
+    def get_from_ctx(self, name):
         pass
 
 
@@ -92,6 +95,22 @@ class Stream:
     def emit_exports(self, exports):
         self.mod_obj.set_exports(exports)
 
+    def emit_typing_module(self):
+        self.mod_obj.is_typing = True
+
+    def get_obj(self, imp_id):
+        return self.mod_obj.get_obj(imp_id)
+
+    def is_typing_module(self, imp_pth):
+        return self.mod_obj.is_typing_module(imp_pth)
+
+    def get_from_ctx(self, name):
+        if self.ns_stack:
+            for ns in reversed(self.ns_stack):
+                ret = ns.get_from_ctx(name)
+                if ret not in [None, Scope.BUBBLE]:
+                    return ret
+
     def resolve_import(self, name: str, dot_count: int):
         abs_name = '.'.join([*self.module_id.split('.')[: -dot_count], name]).rstrip('.')
         return abs_name
@@ -116,6 +135,8 @@ class Stream:
     def emit_method(self, meth_def):
         cls_def = self.ns_stack[-1]
         cls_def.on_method(meth_def)
+
+
 
     def push_node(self, node):
         self.node_stack.append(node)

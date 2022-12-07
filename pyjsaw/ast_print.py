@@ -1,10 +1,23 @@
+import enum
 from typing import TypeVar, Generic, List as tpList, Union, Any, Optional, Mapping
 import typing
 import sys
 import ast
 from ast import iter_fields, AST, Load, Store, Del
+from xml.dom.minidom import Attr
 
 from pyjsaw.stream import Stream, Scope, PREFIX
+from pyjsaw.js_stuff import html
+
+DOLLAR_SIGN = True
+
+
+def with_dollar_prefix(s: str) -> str:
+    if DOLLAR_SIGN and s.startswith(('S_', 'SS_')):
+        dollar, tail = s.split('_', 1)
+        dollar = dollar.replace('S', '$')
+        return f'{dollar}{tail}'
+    return s
 
 
 T = TypeVar('T', bound=ast.AST)
@@ -37,12 +50,95 @@ PRECEDENCE = _make_precedence()
 del _make_precedence
 
 
+class EntType(str, enum.Enum):
+    ITERABLE = 'iterable'
+    CLASS_DEF = 'class_def'
+    MODULE = 'module'
+    NAME = 'name'
+    ATTRIBUTE = 'attribute'
+
+
 class Entity:
 
-    def __init__(self, name: str, kind: str = None, value: 'RSNode[ast.AST]' = None):
+    def __init__(self, name: str, kind: str = None, value: 'RSNode[ast.AST]' = None, ann=None):
         self.name = name
         self.kind = kind
         self.value = value
+        self.ann = ann
+        self.is_variative = False
+
+    def clone(self):
+        return self.__class__(self.name, self.kind, self.value, self.ann)
+
+    @property
+    def type(self) -> Optional[EntType]:
+        if self.value is None or self.is_variative:
+            return
+        if isinstance(self.value, ClassDef):
+            return EntType.CLASS_DEF
+        elif isinstance(self.value, (Tuple, List)):
+            return EntType.ITERABLE
+        elif isinstance(self.value, Name):
+            return EntType.NAME
+        elif isinstance(self.value, Attribute):
+            return EntType.ATTRIBUTE
+        elif hasattr(self.value, 'get_attr'):  # TODO
+            return EntType.MODULE
+
+
+class ScopeMixin:
+    scope_ctx: Mapping[str, Entity] = None
+
+    def _get_attr_chain_from_ctx(self: Union['RSNode', Scope, 'ScopeMixin'], attr_node: 'Attribute'):
+        attr_chain = []
+        cur = attr_node
+        while isinstance(cur, Attribute):
+            attr_chain.append(cur.attr)
+            cur = cur.value
+        if not isinstance(cur, Name):
+            return
+        out = self._output
+        ent: Entity = out.get_from_ctx(cur.id)
+        if ent is None:
+            return
+        obj = ent.value
+        while attr_chain:
+            get_attr = getattr(obj, 'get_attr', None)  # TODO isinstance Module
+            if get_attr is not None:
+                obj = get_attr(attr_chain.pop())
+            else:
+                return
+        else:
+            return obj
+
+    def on_define(self: Union['RSNode', Scope, 'ScopeMixin'], ent: Entity):
+        out = self._output
+        existing = self.scope_ctx.get(ent.name)
+
+        if ent.type in [EntType.NAME, EntType.ATTRIBUTE]:
+            ref = out.get_from_ctx(ent.value)
+            if ref is None:
+                ref = Entity('[external]')
+        else:
+            ref = ent
+
+        if existing is None:
+            self.scope_ctx[ent.name] = ref
+        else:
+            if existing.type is not ref.type:
+                ref = ref.clone()
+                ref.is_variative = True
+            self.scope_ctx[ent.name] = ref
+
+    def get_from_ctx(self, name: Union['Name', 'Attribute', str]):
+        if isinstance(name, Name):
+            name = name.id
+        elif isinstance(name, Attribute):
+            ret = self._get_attr_chain_from_ctx(name)
+            if ret and not isinstance(ret, Entity):
+                ret = Entity('[attr_chain]', value=ret)
+            return ret
+        return self.scope_ctx.get(name)
 
 
 class NodeAttr:
@@ -59,6 +155,7 @@ class NodeMeta(type):
 
 class RSNode(Generic[T], metaclass=NodeMeta):
     generic_attrs = True
+    _origin_node = None  # used to store replaced node, required for parent-child checking
 
     __node_attrs_map__ = {}
 
@@ -96,6 +193,10 @@ class RSNode(Generic[T], metaclass=NodeMeta):
     def created(self) -> Optional['RSNode']:
         self._created_invoked = True
 
+    @property
+    def origin_node(self):
+        return self._origin_node if self._origin_node is not None else self
+
     def morph(self) -> Optional['RSNode']:
         pass
 
@@ -118,6 +219,7 @@ class RSNode(Generic[T], metaclass=NodeMeta):
         if not self._created_invoked:
             replaced = self.created()
             if replaced is not None:
+                replaced._origin_node = self.origin_node
                 replaced.print(output)
                 return
 
@@ -127,6 +229,7 @@ class RSNode(Generic[T], metaclass=NodeMeta):
         if replaced is not None:
             output.pop_node()
             self._output = None
+            replaced._origin_node = self.origin_node
             replaced.print(output)
             return
 
@@ -139,29 +242,39 @@ class RSNode(Generic[T], metaclass=NodeMeta):
         output.pop_node()
         self._output = None
 
+
 class stmt(RSNode[ast.stmt]):
     pass
 
-class ModuleBodyWrapper(RSNode, Scope):
+
+class ModuleBodyWrapper(RSNode, ScopeMixin, Scope):
     body: tpList[stmt] = None
-    exports: Mapping[str, Union['ClassDef', 'FunctionDef']] = None
+    exports: Mapping[str, Union['ClassDef', 'FunctionDef', RSNode]] = None
+    scope_ctx: Mapping[str, Union['ClassDef', 'FunctionDef', RSNode]] = None
     export_as_dict = False
 
     def on_directive(self, name, value):
         if name == 'EXPORTS_AS_DICT' and value:
             self.export_as_dict = True
+        elif name == 'TYPING_MODULE' and value:
+            self._output.emit_typing_module()
 
     def on_assign(self, var: Entity):
         if var.name == '__all__':
             value = var.value
             self.exports[var.name] = ['__name__', *[name.value for name in value.elts]]
-        elif not var.name.startswith((PREFIX, '_')):
-            self.exports[var.name] = True
+        elif not var.name.startswith((PREFIX, '_')) or var.name.startswith('__') and var.name.endswith('__'):
+            if isinstance(var.value, Name) and var.value.id in self.exports:
+                self.exports[var.name] = self.exports[var.value.id]
+            else:
+                self.exports[var.name] = var.value
+        self.on_define(var)
         return self.BUBBLE
 
     def _print(self):
         out = self._output
-        self.exports = {'__name__': True}
+        self.scope_ctx = {}
+        self.exports = {}
         out.push_scope(self)
         for st in self.body:
             with out.as_statement():
@@ -169,6 +282,7 @@ class ModuleBodyWrapper(RSNode, Scope):
                 if isinstance(st, (FunctionDef, ClassDef)):  # TODO use emit as it maybe wrapped in if-else
                     self.exports[st.name] = st
         out.pop_scope()
+
 
 class Exports(RSNode):
     body_wrapper: ModuleBodyWrapper = None
@@ -223,7 +337,7 @@ class Exports(RSNode):
         if name == '__name__':
             setter = 'null'
         else:
-            setter = f'(v)=>{{if (typeof {name} !== "undefined") {name} = v;}})'
+            setter = f'(v)=>{{if (typeof {name} !== "undefined") {name} = v;}}'
 
         return f'["{name}", ()=>{name}, {setter}]'
 
@@ -240,15 +354,14 @@ class JSModule(RSNode[ast.Module]):
                 kind='var',
                 targets=[Name(None, id='__name__')],
                 value=Constant(None, value=self.mod_id),
-                emit=False
             )
         ]
         return ret
 
     def _make_mod_fun_body(self):
         header = self._make_header()
-        body_wrapper = ModuleBodyWrapper(None, body=self.body)
-        body = [*header, body_wrapper]
+        body_wrapper = ModuleBodyWrapper(None, body=[*header, *self.body])
+        body = [body_wrapper]
         if self.include_exports:
             body.append(Exports(None, body_wrapper=body_wrapper))
         return body
@@ -316,9 +429,13 @@ class Import(RSNode[ast.Import]):
 
     def created(self):
         super().created()
-        self.is_fake = bool(self.from_module and self.from_module.startswith('js_'))
-        if not self.is_fake:
-            self.names = [n for n in self.names if not n.name.startswith('js_')]
+        from_module = self.from_module
+        if from_module:
+            if from_module.startswith('pyjsaw.'):
+                from_module = from_module.split('.', 1)[-1]
+            self.is_fake = bool(from_module.startswith('js_') or from_module == 'typing')
+            if not self.is_fake:
+                self.names = [n for n in self.names if not n.name.startswith('js_')]
 
     def _print(self):
         if self.is_fake or not self.names:
@@ -327,13 +444,27 @@ class Import(RSNode[ast.Import]):
         out = self._output
         first = True
         for imp in self.names:
-            var_name = imp.asname or imp.name.split('.', 1)[0]
+            emit_value = None
+            top_mod = imp.name.split('.', 1)[0]
+            var_name = imp.asname or top_mod
             from_module = self.from_module
             if self.level:
                 from_module = out.resolve_import(from_module or '', self.level)
             mod_key = from_module or imp.name
+
             if not self.no_emits:
+                imp_pth = None
                 out.emit_import(mod_key)
+                if from_module:
+                    imp_pth = f'{mod_key}.{imp.name}'
+                    out.emit_import(imp_pth)
+                    emit_value = out.get_obj(imp_pth)
+                else:
+                    emit_value = out.get_obj(top_mod)
+                out.emit_assignment(Entity(var_name, 'var', emit_value))  # TODO
+            if out.is_typing_module(imp_pth or mod_key):
+                continue
+
             if not first:
                 out.end_statement()
                 out.indent()
@@ -341,10 +472,6 @@ class Import(RSNode[ast.Import]):
             out.print_(f'{PREFIX}_modules["{mod_key}"]')
             if from_module:
                 out.print_(f'.{imp.name}')
-                if not self.no_emits:
-                    out.emit_import(f'{mod_key}.{imp.name}')
-            if not self.no_emits:
-                out.emit_assignment(Entity(var_name, 'var'))  # TODO
             first = False
 
 
@@ -377,6 +504,10 @@ class Name(RSNode[ast.Name]):
         if self.ctx is None:
             self.ctx = Load()
 
+    def created(self):
+        super().created()
+        self.id = with_dollar_prefix(self.id)
+
     def _print(self):
         self._output.print_(self.id)
 
@@ -392,8 +523,10 @@ class Attribute(RSNode[ast.Attribute]):
     is_directive = False
 
     def created(self):
-        if isinstance(self.value, Name) and self.value.id == '__RSDirectives__':
+        super().created()
+        if isinstance(self.value, Name) and self.value.id == '__CompilerDirective__':
             self.is_directive = True
+        self.attr = with_dollar_prefix(self.attr)
 
     def _print(self):
         out = self._output
@@ -412,6 +545,8 @@ class Expr(RSNode[ast.Expr]):
 class Constant(RSNode[ast.Name]):
     value: Any = NodeAttr()
     kind: str = NodeAttr()
+
+    str_in_quotes = True
     _constant_map = {
         'True': 'true',
         'False': 'false',
@@ -422,7 +557,7 @@ class Constant(RSNode[ast.Name]):
         out = self._output
         v = self.value
         if isinstance(v, str):
-            v = out.make_string(v, True)
+            v = out.make_string(v, self.str_in_quotes)
         else:
             v = self._constant_map.get(str(v), v)
         out.print_(v)
@@ -473,6 +608,7 @@ class Assign(RSNode[ast.Assign]):
     annotation: expr = None
 
     def created(self):
+        super().created()
         if isinstance(self.targets[0], Attribute) and self.targets[0].is_directive:
             value = self.value
             if isinstance(value, Tuple):
@@ -482,6 +618,8 @@ class Assign(RSNode[ast.Assign]):
             return _Directive(None, name=self.targets[0].attr, value=value)
 
     def _emit_assign_targets(self, targets: list, value):
+        if not self.emit:
+            return
         out = self._output
         for t in targets:
             if isinstance(t, Name):
@@ -545,11 +683,11 @@ class UnaryOp(RSNode[ast.UnaryOp]):
         out = self._output
         p = out.parent()
         # (new bar())()
-        if isinstance(p, Call) and p.func is self:
+        if isinstance(p, Call) and p.func is self.origin_node:
             return True
 
         # (new bar())["prop"], (new bar()).prop
-        if isinstance(p, (Attribute, Subscript)) and p.value is self:
+        if isinstance(p, (Attribute, Subscript)) and p.value is self.origin_node:
             return True
 
 
@@ -627,6 +765,7 @@ class Embed(RSNode[None]):
         v = out.get_embed(self.ctx_key)
         out.print_(v)
 
+
 class Call(BaseCall):
     func: expr = NodeAttr()
     args: tpList[expr] = NodeAttr()
@@ -664,9 +803,11 @@ class Call(BaseCall):
                     ret = BoolOp(None, op=Or(None), values=or_list)
                     return ret
             elif self.func.id in ['typeof', 'new']:
-                ret = UnaryOp(self._pynode)
-                ret.op = unaryop(None, value=self.func.id)
-                ret.operand = self.args[0]
+                ret = UnaryOp(
+                    self._pynode,
+                    op=unaryop(None, value=self.func.id),
+                    operand=self.args[0]
+                )
                 return ret
             elif self.func.id == 'hasattr':
                 ret = Compare(
@@ -681,16 +822,38 @@ class Call(BaseCall):
                     keys=vdict.keys,
                     values=vdict.values,
                 )
+            elif self.func.id == 'print':
+                return Call(
+                    self._pynode,
+                    func=Attribute(None, value=Name(None, id='console'), attr='log'),
+                    args=self.args,
+                )
             else:
                 self.func_name = self.func.id
+
+    def morph(self):
+        out = self._output
+        p = out.parent()
+        if isinstance(p, UnaryOp) and p.op.value == 'new':
+            return
+
+        if isinstance(self.func, (Name, Attribute)):
+            obj_def: Entity = out.get_from_ctx(self.func)
+            if obj_def and obj_def.type is EntType.CLASS_DEF:
+                return UnaryOp(
+                    self._pynode,
+                    op=unaryop(None, value='new'),
+                    operand=self
+                )
 
     def _print(self):
         if self.func_name == 'iif':
             self._print_iif()
             return
         out = self._output
-        if self.func_name:
+        if self.func_name and not out.get_from_ctx(self.func_name):
             out.emit_maybe_baselib_fun(self.func_name)
+
         self.func.print(out)
         with out.in_parens():
             out.sequence(*self.args)
@@ -821,7 +984,7 @@ class BoolOp(RSNode[ast.BoolOp]):
         out = self._output
         p = out.parent()
         # (foo && bar)()
-        if isinstance(p, Call) and p.func is self:
+        if isinstance(p, Call) and p.func is self.origin_node:
             return True
 
         # typeof (foo && bar)
@@ -834,7 +997,7 @@ class BoolOp(RSNode[ast.BoolOp]):
             return po == '&&' and so == '||'
 
         # (foo && bar)["prop"], (foo && bar).prop
-        if isinstance(p, (Attribute, Subscript)) and p.value is self:
+        if isinstance(p, (Attribute, Subscript)) and p.value is self.origin_node:
             return True
 
         # this deals with precedence: 3 * (2 + 1)
@@ -849,12 +1012,21 @@ class BinOp(RSNode[ast.BinOp]):
     op: operator = NodeAttr()
     right: expr = NodeAttr()
 
+    def created(self) -> Optional['RSNode']:
+        super().created()
+        if self.op.value == '*' and isinstance(self.left, Name) and self.left.id == 'new':
+            return UnaryOp(
+                self._pynode,
+                op=unaryop(None, value='new'),
+                operand=self.right
+            )
+
     @property
     def requires_parens(self):
         out = self._output
         p = out.parent()
         # (foo && bar)()
-        if isinstance(p, Call) and p.func is self:
+        if isinstance(p, Call) and p.func is self.origin_node:
             return True
 
         # typeof (foo && bar)
@@ -862,7 +1034,7 @@ class BinOp(RSNode[ast.BinOp]):
             return True
 
         # (foo && bar)["prop"], (foo && bar).prop
-        if isinstance(p, (Attribute, Subscript)) and p.value is self:
+        if isinstance(p, (Attribute, Subscript)) and p.value is self.origin_node:
             return True
 
         # this deals with precedence: 3 * (2 + 1)
@@ -871,7 +1043,7 @@ class BinOp(RSNode[ast.BinOp]):
             pp = PRECEDENCE[po]
             so = self.op.value
             sp = PRECEDENCE[so]
-            if pp > sp or pp == sp and self is p.right and not (so == po and (so == "*" or so == "&&" or so == "||")):
+            if pp > sp or pp == sp and self.origin_node is p.right and not (so == po and (so == "*" or so == "&&" or so == "||")):
                 return True
 
     def _print(self):
@@ -1014,7 +1186,7 @@ class BaseFunctionDef(expr):
     @property
     def requires_parens(self):
         p = self._output.parent()
-        return isinstance(p, Call) and p.func is self
+        return isinstance(p, Call) and p.func is self.origin_node
 
 
 class Lambda(BaseFunctionDef):
@@ -1062,7 +1234,7 @@ class DecoratedExpr(expr):
             tmp.print(out)
 
 
-class FunctionDef(BaseFunctionDef, Scope):
+class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
     _pynode: ast.FunctionDef
 
     name: str = NodeAttr()
@@ -1087,12 +1259,17 @@ class FunctionDef(BaseFunctionDef, Scope):
         return Name(None, id=self.name, ctx=Load())
 
     def on_assign(self, var: Entity):
+        if var.value is self:
+            return Scope.BUBBLE
+
         var_name = var.name
         if self.no_locals and not var_name.startswith(PREFIX):
             return Scope.BUBBLE
 
         if var_name not in self.nonlocals and var_name not in self.vars and not var.kind:
             self.vars[var_name] = True
+
+        self.on_define(var)
 
     def on_yield(self):
         if self.kind in ['get', 'set']:
@@ -1102,11 +1279,14 @@ class FunctionDef(BaseFunctionDef, Scope):
     def _print_vars(self, output: Stream):
         if not self.vars:
             return
+        vars_declare = [name for name, v in self.vars.items() if v]
+        if not vars_declare:
+            return
         out = output
         with out.as_statement():
             out.print_('var')
             out.space()
-            out.sequence(*[name for name, v in self.vars.items() if v])
+            out.sequence(*vars_declare)
 
     def _split_decorators(self) -> typing.Tuple[tpList[expr], typing.Dict[str, str]]:
         if not self.decorator_list:
@@ -1161,6 +1341,7 @@ class FunctionDef(BaseFunctionDef, Scope):
     def _print(self):
 
         self.nonlocals = {}
+        self.scope_ctx = {}
         cnt = 0
         for i, st in enumerate(self.body):
             if isinstance(st, (Global, Nonlocal)):
@@ -1177,6 +1358,8 @@ class FunctionDef(BaseFunctionDef, Scope):
             if self.static or self.classmeth:
                 out.print_('static')
                 out.space()
+        elif self.name:
+            out.emit_assignment(Entity(self.name, 'function', self))
 
         self._print_def()
         if self.decorator_list:
@@ -1212,7 +1395,10 @@ class FunctionDef(BaseFunctionDef, Scope):
                     self.on_assign(Entity(self.args.vararg.arg, None))
                     with out.as_statement():
                         out.assign_vars(self.args.vararg.arg)
-                        out.print_(f'[...arguments].slice({len(self.args.args)})')
+                        out.print_('[...arguments]')
+                        len_args = len(self.args.args)
+                        if len_args:
+                            out.print_(f'.slice({len_args})')
 
                 for st in self.body:
                     out.print_stmt(st)
@@ -1239,6 +1425,7 @@ class YieldFrom(RSNode[ast.YieldFrom]):
     value: expr = NodeAttr()
 
     def created(self) -> Optional['RSNode']:
+        super().created()
         return Yield(self._pynode, value=self.value, is_yield_from=True)
 
 
@@ -1410,15 +1597,22 @@ class For(RSNode[ast.For]):
 
     def _print_iter(self, iter):
         out = self._output
-        if (
-            isinstance(iter, Tuple)
-            or isinstance(iter, Call) and (
-                isinstance(iter.func, Name) and iter.func.id == 'iterable'
-                or isinstance(iter.func, Attribute) and isinstance(iter.func.value, Name)
-                and iter.func.value.id == 'Object'
-                and iter.func.attr in ['keys', 'values', 'entries', 'getOwnPropertyNames', 'getOwnPropertySymbols']
-            )
-        ):
+        if isinstance(iter, Call):
+            if isinstance(iter.func, Name):
+                if iter.func.id == 'iter':
+                    iter.args[0].print(out)
+                    return
+                elif iter.func.id == 'iterable':
+                    iter.print(out)
+                    return
+                elif (
+                    isinstance(iter.func, Attribute) and isinstance(iter.func.value, Name)
+                    and iter.func.value.id == 'Object'
+                    and iter.func.attr in ['keys', 'values', 'entries', 'getOwnPropertyNames', 'getOwnPropertySymbols']
+                ):
+                    iter.print(out)
+                    return
+        elif isinstance(iter, Tuple):
             iter.print(out)
             return
 
@@ -1661,6 +1855,10 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
 
     _in_postproc = False
 
+    def on_assign(self, ent):
+        if ent.value is self:
+            return Scope.BUBBLE
+
     def _this_constructor(self):
         this_name = Name(None, id='this')
         ret_expr = Attribute(
@@ -1725,6 +1923,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         self.methods = []
         self.class_attrs: tpList[Name] = []
         out = self._output
+        out.emit_assignment(Entity(self.name, 'class', self))
         out.spaced('class', self.name)
         if self.bases:
             out.space()
@@ -1821,7 +2020,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         if self.decorator_list:
             self_name = Name(None, id=self.name)
             dec_expr = DecoratedExpr(self_name, self.decorator_list)
-            self_decorate = Assign(None, targets=[self_name], value=dec_expr)
+            self_decorate = Assign(None, targets=[self_name], value=dec_expr, emit=False)
             with out.as_statement():
                 self_decorate.print(out)
 
@@ -1940,6 +2139,7 @@ class ExceptHandler(RSNode[ast.ExceptHandler]):
     is_default: bool = False
 
     def created(self):
+        super().created()
         if isinstance(self.type, Name) and self.type.id in ['Exception', 'BaseException']:
             self.is_default = True
             self.type = None
@@ -2085,13 +2285,19 @@ class VCall(Call):
 
 
 class VTag(Call):
+    func: 'HTagName'
     args: tpList[VCall] = None
 
     @property
     def tag_name(self) -> str:
         return self.func.id
 
+    @property
+    def is_void(self) -> str:
+        return self.func.is_void
+
     def created(self):
+        super().created()
         args = []
         for a in self.args:
             assert isinstance(a, Call)
@@ -2121,33 +2327,57 @@ class VTag(Call):
                 continue
             buf.append(f'{attr}="{v}"')
 
-        attrs = ', '.join(buf)
+        attrs = ' '.join(buf)
         assert isinstance(self.func, Name)
         tag = self.func.id
         if attrs:
-            tag_exp = f'<{tag} {attrs} >'
+            tag_exp = f'<{tag} {attrs} '
         else:
-            tag_exp = f'<{tag}>'
+            tag_exp = f'<{tag}'
         out.print_(tag_exp)
+        if self.is_void:
+            out.print_('/>')
+        else:
+            out.print_('>')
+
+
+class HTagName(Name):
+    is_void = False
 
 
 class VDict(Dict):
 
+    def _get_tag(self, tag: Union[Name, Attribute]) -> HTagName:
+        attr_value = None
+        if isinstance(tag, Attribute):
+            # h.div
+            attr_value = tag.value
+            assert isinstance(attr_value, Name)
+            attr_value = attr_value.id
+            tag = tag.attr
+        else:
+            assert isinstance(tag, Name)
+            tag = tag.id
+
+        tag: str
+        if attr_value == 'h':
+            tag_cls = getattr(html, tag)
+            is_void = issubclass(tag_cls, html.VoidTag)
+            tag = HTagName(None, id=tag.lower(), is_void=is_void)
+        else:
+            tag = HTagName(None, id=tag)
+        return tag
+
     def _transform(self):
         for idx, k in enumerate(self.keys):
-            assert isinstance(k, Call)
-            tag = k.func
-            if isinstance(tag, Attribute):
-                # h.div
-                tag = Name(None, id=tag.attr)
-            else:
-                assert isinstance(tag, Name)
+            tag = self._get_tag(k.func)
             self.keys[idx] = VTag(
                 k._pynode,
                 func=tag,
                 args=k.args,
                 keywords=k.keywords
             )
+
         for idx, v in enumerate(self.values):
             if isinstance(v, Dict):
                 self.values[idx] = VDict(
@@ -2155,9 +2385,13 @@ class VDict(Dict):
                     keys=v.keys,
                     values=v.values
                 )
-            elif isinstance(v, Constant) and not v.value:
-                # no content
-                self.values[idx] = None
+            elif isinstance(v, Constant):
+                if not v.value:
+                    # no content
+                    self.values[idx] = None
+                else:
+                    v.value = str(v.value)
+                    v.str_in_quotes = False
 
     def _print(self):
         self._transform()
@@ -2168,11 +2402,12 @@ class VDict(Dict):
                 for tag, body in zip(self.keys, self.values):
                     tag: VTag
                     tag.print(out)
-                    if body is not None:
-                        out.newline()
-                        with out.indented():
-                            out.indent()
-                            body.print(out)
-                        out.newline()
-                    out.indent()
-                    out.print_(f'</{tag.tag_name}>')
+                    if not tag.is_void:
+                        if body is not None:
+                            out.newline()
+                            with out.indented():
+                                out.indent()
+                                body.print(out)
+                            out.newline()
+                        out.indent()
+                        out.print_(f'</{tag.tag_name}>')
