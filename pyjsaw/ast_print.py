@@ -452,8 +452,8 @@ class Import(RSNode[ast.Import]):
                 from_module = out.resolve_import(from_module or '', self.level)
             mod_key = from_module or imp.name
 
+            imp_pth = None
             if not self.no_emits:
-                imp_pth = None
                 out.emit_import(mod_key)
                 if from_module:
                     imp_pth = f'{mod_key}.{imp.name}'
@@ -1210,24 +1210,40 @@ class Lambda(BaseFunctionDef):
 
 
 class DecoratedExpr(expr):
+    inline = True
 
-    def __init__(self, func: expr, dec_list: tpList[expr]):
+    def __init__(self, func: expr, dec_list: tpList[expr], *, inline=True):
         super().__init__(None)
         self.func = func
         self.decorator_list = dec_list
+        self.inline = inline
 
     def _print(self):
         out = self._output
-        tmp = Name(None)
-        tmp.id = out.newTemp()
+        if not self.inline:
+            if len(self.decorator_list) == 1:
+                exp = Call(
+                    None,
+                    func=self.decorator_list[0],
+                    args=[self.func]
+                )
+            else:
+                decor_mangled = f'{PREFIX}_decor'
+                exp = Call(
+                    None,
+                    func=Name(None, id=decor_mangled),
+                    args=[*self.decorator_list, self.func]
+                )
+                out.emit_use_baselib_fun('decor', decor_mangled)
+            exp.print(out)
+            return
+
+        tmp = Name(None, id=out.newTemp())
         arg = self.func
         with out.in_parens():
             for dec in reversed(self.decorator_list):
                 out.assign_vars(tmp, spaced=False)
-                dec_call = Call(None)
-                dec_call.keywords = []
-                dec_call.func = dec
-                dec_call.args = [arg]
+                dec_call = Call(None, func=dec, args=[arg])
                 dec_call.print(out)
                 out.comma()
                 arg = tmp
@@ -1250,7 +1266,7 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
     vars: Mapping[str, bool]
 
     # class stuff
-    has_self_arg = True
+    has_self_arg = None
     static = False
     classmeth = False
 
@@ -1329,14 +1345,13 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
                     self.kind = 'get'
             self.decorator_list = regular
 
-        if not self.static and self.has_self_arg:
+        # as we are in class definition, has_self_arg is set to True for all user defined methods
+        # see ClassDef body serialization
+        if self.static:
+            self.has_self_arg = False
+        elif self.has_self_arg:
             if not self.args.args:
                 raise SyntaxError('At least one arg required (self)')
-            self_arg = self.args.args.pop(0)
-            self_name = Name(None, id=self_arg.arg)
-            this_name = Name(None, id='this')
-            self_assign = Assign(None, targets=[self_name], value=this_name)
-            self.body.insert(0, self_assign)
 
     def _print(self):
 
@@ -1373,6 +1388,13 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
                 dec_expr.print(out)
 
     def _print_def(self):
+        if self.has_self_arg:
+            self_arg = self.args.args.pop(0)
+            self_name = Name(None, id=self_arg.arg)
+            this_name = Name(None, id='this')
+            self_assign = Assign(None, targets=[self_name], value=this_name)
+            self.body.insert(0, self_assign)
+
         out = self._output
         if self.kind:
             out.print_(self.kind)
@@ -1768,6 +1790,7 @@ class Break(RSNode[ast.Break]):
         out = self._output
         out.print_('break')
 
+
 class Continue(RSNode[ast.Continue]):
     def _print(self):
         out = self._output
@@ -1843,6 +1866,18 @@ class JoinedStr(RSNode[ast.JoinedStr]):
         out.print_('`')
 
 
+class Literal(RSNode[None]):
+    dct: Dict = None
+    decorator_list: tpList[expr] = None
+
+    def _print(self):
+        out = self._output
+        exp = self.dct
+        if self.decorator_list:
+            exp = DecoratedExpr(exp, self.decorator_list, inline=False)
+        exp.print(out)
+
+
 class ClassDef(RSNode[ast.ClassDef], Scope):
     name: str = NodeAttr()
     bases: tpList[expr] = NodeAttr()
@@ -1912,11 +1947,51 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
 
     def created(self):
         super().created()
+        literal = self._get_literal()
+        if literal:
+            return literal
         class_getter = self._inst_class_attr_getter('', '__class__')
         self.body.insert(0, class_getter)
 
     def on_method(self, meth_def):
         pass
+
+    def _get_literal(self):
+        for idx, dec in enumerate(self.decorator_list):
+            if isinstance(dec, Name) and dec.id == 'literal':
+                self.decorator_list.pop(idx)
+                break
+        else:
+            return
+
+        keys = []
+        values = []
+
+        for st in self.body:
+            if isinstance(st, Assign):
+                assert isinstance(st.targets[0], Name)
+                keys.append(Constant(None, value=st.targets[0].id, str_in_quotes=False))
+                value = st.value
+            elif isinstance(st, FunctionDef):
+                keys.append(Constant(None, value=st.name, str_in_quotes=False))
+                st.name = ''
+                if st.args and st.args.args and st.args.args[0].arg == 'self':
+                    st.has_self_arg = True
+                if st.decorator_list:
+                    dlist = [*st.decorator_list]
+                    st.decorator_list = None
+                    st = DecoratedExpr(st, dlist, inline=False)
+                value = st
+            values.append(value)
+
+        dct = Dict(
+            None,
+            keys=keys,
+            values=values,
+        )
+        literal = Literal(self._pynode, dct=dct, decorator_list=self.decorator_list)
+        ret = Assign(self._pynode, targets=[Name(None, id=self.name)], value=literal)
+        return ret
 
     def _print(self):
         self._in_postproc = False
@@ -1935,6 +2010,8 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
                     with out.as_statement():
                         out.spaced('static', st)
                 elif isinstance(st, FunctionDef):
+                    if st.has_self_arg is None:
+                        st.has_self_arg = True
                     self.methods.append(st)
                     with out.as_statement():
                         st.print(out)
@@ -1966,8 +2043,6 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         for m in self.methods:
             if not m.decorator_list:
                 continue
-            kind = Constant(None, value=m.kind)
-            dec_expr = DecoratedExpr(Name(None, id='func'), m.decorator_list)
             static = m.static or m.classmeth
             params.append([static, m.name, m.kind, m.decorator_list])
         if params:

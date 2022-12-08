@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Type
 from enum import Enum, auto
 
 arguments = object()
@@ -69,3 +69,7 @@ class New:
 
 
 new = New()
+
+
+def literal(cls: Type[T]) -> T:
+    return cls()

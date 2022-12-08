@@ -1,5 +1,5 @@
 from pyjsaw.js_stuff.vuestuff import VDot as v, VTempl
-from pyjsaw.js_stuff.js_obj import new
+from pyjsaw.js_stuff.js_obj import new, literal
 from pyjsaw.js_stuff import html as h
 from vuetyping import Vue
 
@@ -12,21 +12,16 @@ templ = VTempl({
 })
 
 
-def data():
-    return {
-        'msg': 'Hi there',
-        'hidden_visible': False
-    }
+@Vue
+@literal
+class vc:
+    template = templ
 
+    def data(self):
+        return {
+            'msg': 'Hi there',
+            'hidden_visible': False
+        }
 
-vc = Vue({
-    'data': data,
-    'template': templ
-})
 
 vc.S_mount('#app')
-
-obj = {'a': 45, 'foo': 100}
-
-for k in dir(obj):
-    print(k)

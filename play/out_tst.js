@@ -139,26 +139,20 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
 
 
 (function (){
-    var templ, vc, obj, k;
+    var templ, vc;
     var __name__ = "__main__";
     templ = '<div v-bind:class="{\'some-class\': true}" class="some-class" ><span>{{msg}}</span><button v-on:click="hidden_visible=!hidden_visible" >Toggle hidden</button><div v-if="hidden_visible" v-for="idx in 5" >Now you see me! idx={{idx}}</div></div>';
-    function data(){
-        return {
-            "msg": "Hi there", 
-            "hidden_visible": false
-        };
-    };
     vc = new Vue({
-        "data": data, 
-        "template": templ
+        template: templ, 
+        data: function (){
+            var self;
+            self = this;
+            return {
+                "msg": "Hi there", 
+                "hidden_visible": false
+            };
+        }
     });
     vc.$mount("#app");
-    obj = {
-        "a": 45, 
-        "foo": 100
-    };
-    for(k in obj){
-        console.log(k);
-    };
 })()
 })()
