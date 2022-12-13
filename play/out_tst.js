@@ -3,7 +3,7 @@ function ϟ_def_modules(){
     var modules;
     modules = {};
     function set_export(prop, get, set){
-        var rs_mod, mod_id;
+        var rs_mod, mod_id, def_prop;
         rs_mod = this;
         if(Array.isArray(prop)){
             for(args of prop){rs_mod.export(...args)};
@@ -14,12 +14,15 @@ function ϟ_def_modules(){
             get = () => modules[mod_id];
             set = null;
         };
-        Object.defineProperty(rs_mod["exports"], prop, {
+        def_prop = {
             "configurable": true, 
             "enumerable": true, 
-            "get": get, 
-            "set": set
-        });
+            "get": get
+        };
+        if(set){
+            def_prop["set"] = set;
+        };
+        Object.defineProperty(rs_mod["exports"], prop, def_prop);
     };
     function def_module(mod_id){
         var rs_mod_id, rs_mod;
@@ -92,8 +95,11 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
         };
         return Object.keys(obj).length;
     };
-    function isstr(s){
-        return s.constructor === STR_CTR || s instanceof String;
+    function type(obj){
+        if(obj === null){
+            return null;
+        };
+        return Object.getPrototypeOf(obj).constructor;
     };
     function max(a){
         return Math.max.apply(null, Array.isArray(a) ? a : arguments);
@@ -133,15 +139,15 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
     
     // exports
     var ϟ_mod = ϟ_modules["ϟ:baselib"];
-    Object.assign(ϟ_modules["ϟ:baselib"].exports, {__name__, STR_CTR, ARR_CTR, SET_CTR, is_in, iterable, len, isstr, max, min, reversed, sorted, hasattr, dir, decor});
+    Object.assign(ϟ_modules["ϟ:baselib"].exports, {__name__, STR_CTR, ARR_CTR, SET_CTR, is_in, iterable, len, type, max, min, reversed, sorted, hasattr, dir, decor});
     return ϟ_mod;
 };
 
-
+;
 (function (){
     var templ, vc;
     var __name__ = "__main__";
-    templ = '<div v-bind:class="{\'some-class\': true}" class="some-class" ><span>{{msg}}</span><button v-on:click="hidden_visible=!hidden_visible" >Toggle hidden</button><div v-if="hidden_visible" v-for="idx in 5" >Now you see me! idx={{idx}}</div></div>';
+    templ = '<div v-bind:class="{\'some-class\': true}" class="some-static-class" ><span>{{msg}}</span><button v-on:click="hidden_visible=!hidden_visible" >Toggle hidden</button><div v-if="hidden_visible" v-for="idx in 5" >Now you see me! idx={{idx}}</div><button v-on:click="some" >Run method (see console)</button></div>';
     vc = new Vue({
         template: templ, 
         data: function (){
@@ -151,6 +157,13 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
                 "msg": "Hi there", 
                 "hidden_visible": false
             };
+        }, 
+        methods: {
+            some: function (){
+                var self;
+                self = this;
+                console.log("some-method invoked");
+            }
         }
     });
     vc.$mount("#app");

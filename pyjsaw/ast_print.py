@@ -262,7 +262,9 @@ class ModuleBodyWrapper(RSNode, ScopeMixin, Scope):
     def on_assign(self, var: Entity):
         if var.name == '__all__':
             value = var.value
-            self.exports[var.name] = ['__name__', *[name.value for name in value.elts]]
+            self.exports[var.name] = [
+                '__name__', *[name.id if isinstance(name, Name) else name.value for name in value.elts]
+            ]
         elif not var.name.startswith((PREFIX, '_')) or var.name.startswith('__') and var.name.endswith('__'):
             if isinstance(var.value, Name) and var.value.id in self.exports:
                 self.exports[var.name] = self.exports[var.value.id]
@@ -308,7 +310,7 @@ class Exports(RSNode):
         out = self._output
         exports = self.body_wrapper.exports
         if '__all__' in exports:
-            exports = exports['__all__']
+            exports = {k: exports[k] for k in exports['__all__']}
         out.emit_exports(exports)
 
         seen = set()
@@ -431,11 +433,15 @@ class Import(RSNode[ast.Import]):
         super().created()
         from_module = self.from_module
         if from_module:
-            if from_module.startswith('pyjsaw.'):
-                from_module = from_module.split('.', 1)[-1]
-            self.is_fake = bool(from_module.startswith('js_') or from_module == 'typing')
-            if not self.is_fake:
-                self.names = [n for n in self.names if not n.name.startswith('js_')]
+            self.is_fake = bool(
+                from_module == 'typing' or from_module.startswith('js_') or '.js_' in from_module
+            )
+
+        if not self.is_fake:
+            self.names = [
+                n for n in self.names
+                if not (n.name == 'typing' and not from_module or n.name.startswith('js_') or '.js_' in n.name)
+            ]
 
     def _print(self):
         if self.is_fake or not self.names:
@@ -461,7 +467,10 @@ class Import(RSNode[ast.Import]):
                     emit_value = out.get_obj(imp_pth)
                 else:
                     emit_value = out.get_obj(top_mod)
-                out.emit_assignment(Entity(var_name, 'var', emit_value))  # TODO
+                if not out.is_typing_module(imp_pth or mod_key):
+                    out.emit_assignment(Entity(var_name, 'var', emit_value))  # TODO
+                else:
+                    out.emit_define(Entity(var_name, 'var', emit_value))  # TODO
             if out.is_typing_module(imp_pth or mod_key):
                 continue
 
@@ -780,7 +789,9 @@ class Call(BaseCall):
             if self.func.attr == 'EMBED':
                 return Embed(None, ctx_key=self.args[0].value)
         elif isinstance(self.func, Name):
-            if self.func.id == 'isinstance':
+            if self.func.id in ['isinstance', 'issubclass']:
+                if self.func.id == 'issubclass':
+                    self.args[0] = Attribute(self.args[0]._pynode, value=self.args[0], attr='prototype')
                 if isinstance(self.args[1], Name):
                     ret = BinOp(self._pynode, op=InstanceOf(None))
                     ret.left, ret.right = self.args
@@ -1451,10 +1462,8 @@ class YieldFrom(RSNode[ast.YieldFrom]):
         return Yield(self._pynode, value=self.value, is_yield_from=True)
 
 
-
-class Tuple(RSNode[ast.Tuple]):
+class _Sequence(RSNode[ast.Tuple]):
     elts: tpList[expr] = NodeAttr()
-    ctx: Union[Load, Store] = NodeAttr()
 
     multilined = False
 
@@ -1477,16 +1486,40 @@ class Tuple(RSNode[ast.Tuple]):
             else:
                 out.sequence(*self.elts)
 
+
+class Tuple(_Sequence):
+    ctx: Union[Load, Store] = NodeAttr()
+
+
 class List(Tuple):
     pass
 
-class Set(Tuple):
+
+class Set(_Sequence):
     pass
+
+
+class Delete(RSNode[ast.Delete]):
+    targets: tpList[expr] = NodeAttr()
+
+    def _print(self):
+        out = self._output
+        for exp in self.targets:
+            with out.as_statement():
+                out.print_('delete')
+                out.space()
+                exp.print(out)
 
 
 class Dict(RSNode[ast.Dict]):
     keys: tpList[Optional[expr]] = NodeAttr()
     values: tpList[expr] = NodeAttr()
+
+    @property
+    def requires_parens(self):
+        out = self._output
+        p = out.parent()
+        return isinstance(p, Lambda) and p.body is self.origin_node
 
     def _print(self):
         out = self._output
@@ -1507,6 +1540,7 @@ class Dict(RSNode[ast.Dict]):
                 out.colon()
                 v.print(out)
             out.newline()
+
 
 class Starred(RSNode[ast.Starred]):
     value: expr = NodeAttr()
@@ -2385,6 +2419,9 @@ class VTag(Call):
                 )
             )
         self.args[:] = args
+
+    def morph(self):
+        pass
 
     def _print(self):
         out = self._output

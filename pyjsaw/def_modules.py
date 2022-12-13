@@ -1,4 +1,4 @@
-from js_obj import Object, Array, this
+from pyjsaw.js_stuff.js_obj import Object, Array, this, typeof
 
 
 def __def_modules__():
@@ -15,12 +15,16 @@ def __def_modules__():
             get = lambda: modules[mod_id]
             set = None
 
-        Object.defineProperty(rs_mod["exports"], prop, {
+        def_prop = {
             'configurable': True,
             'enumerable': True,
             'get': get,
-            'set': set,
-        })
+        }
+
+        if set:
+            def_prop['set'] = set
+
+        Object.defineProperty(rs_mod["exports"], prop, def_prop)
 
     def def_module(mod_id):
         rs_mod_id = f"{{PREFIX}}:{mod_id}"

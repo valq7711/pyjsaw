@@ -30,8 +30,10 @@ def len(obj):
     return Object.keys(obj).length
 
 
-def isstr(s):
-    return s.constructor is STR_CTR or isinstance(s, String)
+def type(obj):
+    if obj is None:
+        return None
+    return Object.getPrototypeOf(obj).constructor
 
 
 def max(a):

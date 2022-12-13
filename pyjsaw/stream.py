@@ -14,6 +14,9 @@ def _noop():
 class Scope:
     BUBBLE = object()
 
+    def on_define(self, payload):
+        pass
+
     def on_assign(self, payload):
         pass
 
@@ -112,7 +115,7 @@ class Stream:
                     return ret
 
     def resolve_import(self, name: str, dot_count: int):
-        abs_name = '.'.join([*self.module_id.split('.')[: -dot_count], name]).rstrip('.')
+        abs_name = self.mod_obj.resolve_import(f'{"." * dot_count}{name}')
         return abs_name
 
     def compile(self, mod_ast, module_id=None):
@@ -124,6 +127,12 @@ class Stream:
         if self.ns_stack:
             for ns in reversed(self.ns_stack):
                 if ns.on_assign(payload) is not Scope.BUBBLE:
+                    break
+
+    def emit_define(self, payload):
+        if self.ns_stack:
+            for ns in reversed(self.ns_stack):
+                if ns.on_define(payload) is not Scope.BUBBLE:
                     break
 
     def emit_directive(self, name, value):

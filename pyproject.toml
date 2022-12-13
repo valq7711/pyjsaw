@@ -1,7 +1,7 @@
 [project]
 name = "pyjsaw"
-description = "pyjsaw - funny IDE for websaw framework"
-requires-python = ">=3.7"
+description = "pyjsaw - python to javascript compiler with integrated Vue support"
+requires-python = ">=3.8"
 license = {file = "LICENSE"}
 keywords = ["python", "webapplication", "vue", "javascript", "js"]
 authors = [

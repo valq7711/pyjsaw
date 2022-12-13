@@ -1,3 +1,7 @@
+import sys
+import os
+import importlib.util as imp_util
+
 from typing import Dict, Union
 from pathlib import Path
 import ast
@@ -5,6 +9,7 @@ from ast import AST
 from pyjsaw.stream import Stream
 import pyjsaw.ast_print as ast_print
 from pyjsaw.ast_print import PREFIX, Import, alias
+from pyjsaw.utils import imp_to_path
 
 
 class NodeTransformer:
@@ -78,6 +83,13 @@ class Module:
         self.baselib_imports: Dict[str, bool] = {}
         self.embed_ctx = embed_ctx or {}
         self.is_typing = False
+        self.is_init = fp.name == '__init__.py'
+        if not mod_id:
+            self.pkg_id = None
+        elif self.is_init:
+            self.pkg_id = self.mod_id
+        else:
+            self.pkg_id = '.'.join(self.mod_id.split('.')[:-1])
 
         self._baselib_mod = None
         if not top_level:
@@ -91,6 +103,9 @@ class Module:
     @property
     def top_level(self):
         return self._top_level or self
+
+    def resolve_import(self, imp_mod: str):
+        return imp_util.resolve_name(imp_mod, self.pkg_id)
 
     def get_obj(self, imp_id: str):
         *mod_id, exp = imp_id.split('.')
@@ -179,6 +194,7 @@ class Module:
                         f'{PREFIX}_modules["{PREFIX}:{mod_id}"].export("{sub}", "{mod_id}.{sub}")'
                     )
             stream.sequence(*[m.output for m in printable_modules.values()], sep='\n\n')
+            stream.semicolon()
             stream.newline()
             stream.print_(self.output)
             self.output = stream.get()
@@ -205,11 +221,10 @@ class Module:
             return
         if mod_id in self.import_stack:
             raise RuntimeError(f'Recursive imports detected: {mod_id}, stack={self.import_stack}')
-        mod_path = self.dir / mod_id.replace('.', '/')
-        if mod_path.is_dir():
-            mod_path = mod_path / '__init__.py'
-        else:
-            mod_path = mod_path.with_suffix('.py')
+
+        mod_path = imp_to_path(mod_id)
+        if not mod_path:
+            raise RuntimeError(f'Not found: {mod_id}')
 
         pkg = None
         if '.' in mod_id:
@@ -232,8 +247,14 @@ class Module:
 
         self.import_stack.append(mod_id)
         mod = Module(mod_path, mod_id, self)
-        mod.compile()
         self.all_modules[mod_id] = mod
+        mod_id_dot = f'{mod_id}.'
+        if not mod_id_dot.startswith('pyjsaw.') or mod_id_dot.startswith('pyjsaw.typing.'):
+            print('compile:', mod_id)
+            mod.compile()
+        else:
+            mod.is_typing = True
+
         self.import_stack.pop()
 
         if pkg:
@@ -244,7 +265,10 @@ class Module:
 def compile(fp: Union[Path, str]):
     if isinstance(fp, str):
         fp = Path(fp)
+    cur_dir = sys.path[0]
+    sys.path[0] = str(fp.parent.resolve())
     main = Module(fp, embed_ctx={})
     main.compile()
     out = main.wrapped()
+    sys.path[0] = cur_dir
     return out
