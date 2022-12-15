@@ -14,6 +14,9 @@ def _noop():
 class Scope:
     BUBBLE = object()
 
+    def on_super_call(self):
+        pass
+
     def on_define(self, payload):
         pass
 
@@ -79,6 +82,10 @@ class Stream:
 
     def get_embed(self, key: str):
         return self.mod_obj.get_embed(key)
+
+    def emit_super_call(self):
+        if self.ns_stack:
+            self.ns_stack[-1].on_super_call()
 
     def emit_yield(self):
         if self.ns_stack:

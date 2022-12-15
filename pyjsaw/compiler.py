@@ -184,18 +184,19 @@ class Module:
             self.print_baselib(stream)
             stream.newline()
             printable_modules = {k: m for k, m in self.all_modules.items() if not m.is_typing}
-            for mod_id, mod_obj in printable_modules.items():
-                stream.print_stmt(f'{PREFIX}_defmod("{mod_id}")')
+            if printable_modules:
+                for mod_id, mod_obj in printable_modules.items():
+                    stream.print_stmt(f'{PREFIX}_defmod("{mod_id}")')
 
-            # define subs
-            for mod_id, mod_obj in printable_modules.items():
-                for sub in mod_obj.subs:
-                    stream.print_stmt(
-                        f'{PREFIX}_modules["{PREFIX}:{mod_id}"].export("{sub}", "{mod_id}.{sub}")'
-                    )
-            stream.sequence(*[m.output for m in printable_modules.values()], sep='\n\n')
-            stream.semicolon()
-            stream.newline()
+                # define subs
+                for mod_id, mod_obj in printable_modules.items():
+                    for sub in mod_obj.subs:
+                        stream.print_stmt(
+                            f'{PREFIX}_modules["{PREFIX}:{mod_id}"].export("{sub}", "{mod_id}.{sub}")'
+                        )
+                stream.sequence(*[m.output for m in printable_modules.values()], sep=';\n\n')
+                stream.semicolon()
+                stream.newline()
             stream.print_(self.output)
             self.output = stream.get()
 
@@ -203,6 +204,8 @@ class Module:
         return '\n'.join(['(function(){', self.output, '})()'])
 
     def request_baselib_fun(self, fun: str, mangled: str = None, *, maybe=False):
+        if self.is_typing:
+            return
         if maybe:
             if fun in self.top_level._baselib_mod.exports:
                 if not mangled:

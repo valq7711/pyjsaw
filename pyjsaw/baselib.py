@@ -1,5 +1,7 @@
 from typing import Union
-from pyjsaw.js_stuff.js_obj import typeof, Symbol, Object, Set, String, Math, Array, arguments, __CompilerDirective__
+from pyjsaw.js_stuff import __CompilerDirective__
+from pyjsaw.typing.jstyping import typeof, Symbol, Object, Set, Math, Array, arguments
+
 
 STR_CTR = ''.constructor
 ARR_CTR = [].constructor
@@ -61,8 +63,20 @@ def hasattr(obj, name):
 
 
 def dir(obj):
-    for p in dir(obj):
-        yield p
+    seen = Set()
+    for k, v in Object.entries(Object.getOwnPropertyDescriptors(obj)):
+        seen.add(k)
+        yield k, v
+
+    cur = Object.getPrototypeOf(obj)
+    while cur:
+        if cur.constructor and cur.constructor is Object:
+            break
+        for k, v in Object.entries(Object.getOwnPropertyDescriptors(cur)):
+            if not seen.has(k):
+                seen.add(k)
+                yield k, v
+        cur = Object.getPrototypeOf(cur)
 
 
 def decor(*args):

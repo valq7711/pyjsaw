@@ -4,8 +4,6 @@ import typing
 import sys
 import ast
 from ast import iter_fields, AST, Load, Store, Del
-from xml.dom.minidom import Attr
-
 from pyjsaw.stream import Stream, Scope, PREFIX
 from pyjsaw.js_stuff import html
 
@@ -862,8 +860,12 @@ class Call(BaseCall):
             self._print_iif()
             return
         out = self._output
-        if self.func_name and not out.get_from_ctx(self.func_name):
-            out.emit_maybe_baselib_fun(self.func_name)
+        is_super_call = False
+        if self.func_name:
+            if self.func_name == 'super':
+                is_super_call = True
+            elif not self.func_name.startswith(PREFIX) and not out.get_from_ctx(self.func_name):
+                out.emit_maybe_baselib_fun(self.func_name)
 
         self.func.print(out)
         with out.in_parens():
@@ -883,6 +885,8 @@ class Call(BaseCall):
                             out.print_(kw.arg)
                             out.colon()
                             kw.value.print(out)
+        if is_super_call:
+            out.emit_super_call()
 
     def _print_iif(self):
         out = self._output
@@ -1281,9 +1285,18 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
     static = False
     classmeth = False
 
+    has_super_call = False
+    self_arg = None
+
     @property
     def _name(self):
         return Name(None, id=self.name, ctx=Load())
+
+    def on_super_call(self):
+        out = self._output
+        self.has_super_call = True
+        out.end_statement()
+        self._print_self_assign(out)
 
     def on_assign(self, var: Entity):
         if var.value is self:
@@ -1303,17 +1316,32 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
             raise SyntaxError(f'JS descriptor can`t be generator: {self.name}')
         self.is_generator = True
 
+    def _print_self_assign(self, output: Stream, emit=True):
+        out = output
+        self_name = Name(None, id=self.self_arg or 'self')
+        this_name = Name(None, id='this')
+        self_assign = Assign(None, targets=[self_name], value=this_name, emit=emit)
+        out.print_stmt(self_assign)
+
     def _print_vars(self, output: Stream):
-        if not self.vars:
-            return
-        vars_declare = [name for name, v in self.vars.items() if v]
+        out = output
+        self_arg = None
+        if self.has_self_arg:
+            self_arg = self.self_arg or 'self'
+            self.vars.pop(self_arg, None)
+
+        vars_declare = []
+        if self_arg:
+            vars_declare.append(self_arg)
+        vars_declare.extend([name for name, v in self.vars.items() if v])
         if not vars_declare:
             return
-        out = output
         with out.as_statement():
             out.print_('var')
             out.space()
             out.sequence(*vars_declare)
+        if self.has_self_arg and not self.has_super_call:
+            self._print_self_assign(out, emit=False)
 
     def _split_decorators(self) -> typing.Tuple[tpList[expr], typing.Dict[str, str]]:
         if not self.decorator_list:
@@ -1363,6 +1391,7 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
         elif self.has_self_arg:
             if not self.args.args:
                 raise SyntaxError('At least one arg required (self)')
+            self.self_arg = self.args.args.pop(0).arg
 
     def _print(self):
 
@@ -1384,8 +1413,11 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
             if self.static or self.classmeth:
                 out.print_('static')
                 out.space()
-        elif self.name:
-            out.emit_assignment(Entity(self.name, 'function', self))
+        else:
+            if self.name:
+                out.emit_assignment(Entity(self.name, 'function', self))
+            if self.has_self_arg:
+                self.self_arg = self.args.args.pop(0).arg
 
         self._print_def()
         if self.decorator_list:
@@ -1399,13 +1431,6 @@ class FunctionDef(BaseFunctionDef, ScopeMixin, Scope):
                 dec_expr.print(out)
 
     def _print_def(self):
-        if self.has_self_arg:
-            self_arg = self.args.args.pop(0)
-            self_name = Name(None, id=self_arg.arg)
-            this_name = Name(None, id='this')
-            self_assign = Assign(None, targets=[self_name], value=this_name)
-            self.body.insert(0, self_assign)
-
         out = self._output
         if self.kind:
             out.print_(self.kind)
@@ -1658,16 +1683,18 @@ class For(RSNode[ast.For]):
                 if iter.func.id == 'iter':
                     iter.args[0].print(out)
                     return
-                elif iter.func.id == 'iterable':
+                elif iter.func.id in ['iterable', 'dir']:
                     iter.print(out)
                     return
-                elif (
-                    isinstance(iter.func, Attribute) and isinstance(iter.func.value, Name)
-                    and iter.func.value.id == 'Object'
-                    and iter.func.attr in ['keys', 'values', 'entries', 'getOwnPropertyNames', 'getOwnPropertySymbols']
-                ):
-                    iter.print(out)
-                    return
+            elif (
+                isinstance(iter.func, Attribute) and isinstance(iter.func.value, Name)
+                and iter.func.value.id == 'Object'
+                and iter.func.attr in [
+                    'keys', 'values', 'entries', 'getOwnPropertyNames', 'getOwnPropertySymbols',
+                ]
+            ):
+                iter.print(out)
+                return
         elif isinstance(iter, Tuple):
             iter.print(out)
             return
@@ -1715,7 +1742,7 @@ class For(RSNode[ast.For]):
                 counter_assign = Assign(None)
                 counter_assign.targets = [counter]
                 counter_assign.value = tmp_counter
-            elif iter.func.id == 'dir':
+            elif iter.func.id == 'iterkeys':
                 iter = iter.args[0]
                 op = 'in'
 

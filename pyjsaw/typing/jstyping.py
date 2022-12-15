@@ -15,7 +15,10 @@ class JSON:
 
 
 class RegExp:
-    def exec(self):
+    def exec(self, v):
+        ...
+
+    def test(self, v):
         ...
 
 
@@ -48,6 +51,14 @@ class Object:
 
     @staticmethod
     def hasOwnProperty(obj, p: str) -> bool:
+        ...
+
+    @staticmethod
+    def getOwnPropertyDescriptors(obj) -> dict:
+        ...
+
+    @staticmethod
+    def getOwnPropertyNames(obj) -> dict:
         ...
 
 
