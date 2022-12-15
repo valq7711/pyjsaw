@@ -2382,9 +2382,12 @@ class VCall(Call):
         elif self.v_bindings:
             buf = []
             for dst, src in self.v_bindings.items():
-                if dst == 'Class':
+                if dst in ['Class', 'Is']:
                     dst = dst.lower()
-                attr_value = f'{self.v_attr}:{dst}="{src}"'
+                if src is None or src is True:
+                    attr_value = f'{self.v_attr}:{dst}'
+                else:
+                    attr_value = f'{self.v_attr}:{dst}="{src}"'
                 buf.append(attr_value)
             return buf
         else:
@@ -2402,10 +2405,17 @@ class VCall(Call):
     def _parse_args(self):
         self.v_bindings = {}
         if self.args:
-            if len(self.args) == 1 and isinstance(self.args[0], Constant):
+            if len(self.args) == 1 and isinstance(self.args[0], (Dict, Constant)):
                 a = self.args[0]
-                assert isinstance(a.value, str)
-                self.v_exp = a.value
+                if isinstance(a, Constant):
+                    assert isinstance(a.value, str)
+                    self.v_exp = a.value
+                else:
+                    assert isinstance(a, Dict)
+                    # keys and values  must be Constant
+                    # we need to unquote values as they are js-expressions
+                    for dst, src in zip(a.keys, a.values):
+                        self.v_bindings[dst.value] = src.value
                 return
             else:
                 # v.bind(('[foo]', bar), some='baz')
@@ -2470,7 +2480,7 @@ class VTag(Call):
         assert isinstance(self.func, Name)
         tag = self.func.id
         if attrs:
-            tag_exp = f'<{tag} {attrs} '
+            tag_exp = f'<{tag} {attrs}'
         else:
             tag_exp = f'<{tag}'
         out.print_(tag_exp)

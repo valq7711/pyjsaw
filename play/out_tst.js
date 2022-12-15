@@ -121,9 +121,24 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
         return name in obj;
     };
     function *dir(obj){
-        var p;
-        for(p in obj){
-            yield p;
+        var seen, k, v, cur;
+        seen = new Set();
+        for([k, v] of Object.entries(Object.getOwnPropertyDescriptors(obj))){
+            seen.add(k);
+            yield [k, v];
+        };
+        cur = Object.getPrototypeOf(obj);
+        while(cur){
+            if(cur.constructor && cur.constructor === Object){
+                break;
+            };
+            for([k, v] of Object.entries(Object.getOwnPropertyDescriptors(cur))){
+                if(!seen.has(k)){
+                    seen.add(k);
+                    yield [k, v];
+                };
+            };
+            cur = Object.getPrototypeOf(cur);
         };
     };
     function decor(){
@@ -143,29 +158,48 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
     return ϟ_mod;
 };
 
-;
 (function (){
-    var templ, vc;
+    var page_templ, Page, app_templ, App, app;
     var __name__ = "__main__";
-    templ = '<div v-bind:class="{\'some-class\': true}" class="some-static-class" ><span>{{msg}}</span><button v-on:click="hidden_visible=!hidden_visible" >Toggle hidden</button><div v-if="hidden_visible" v-for="idx in 5" >Now you see me! idx={{idx}}</div><button v-on:click="some" >Run method (see console)</button></div>';
-    vc = new Vue({
-        template: templ, 
+    page_templ = '<div><h3>{{title}}</h3><div class="header"><slot name="header">[default header]</slot></div><div class="content"><slot name="content">Sorry, it seems no content today</slot></div><button v-on:click="toggle_footer">{{footer_visible ? \'Hide\' : \'Show\' }} footer</button><div v-show="footer_visible" class="footer"><slot name="footer">[default footer]</slot></div></div>';
+    Page = {
+        template: page_templ, 
+        props: {
+            "title": {
+                "type": String, 
+                "default": "Page Title"
+            }
+        }, 
         data: function (){
             var self;
             self = this;
             return {
-                "msg": "Hi there", 
-                "hidden_visible": false
+                "footer_visible": false
             };
         }, 
         methods: {
-            some: function (){
+            toggle_footer: function (){
                 var self;
                 self = this;
-                console.log("some-method invoked");
+                self.footer_visible = !self.footer_visible;
             }
         }
-    });
-    vc.$mount("#app");
+    };
+    app_templ = '<Page v-bind:title="app_title"><template v-slot:header>Page Header goes here</template><template v-slot:content>Some content from App-component</template></Page>';
+    App = {
+        template: app_templ, 
+        data: function (){
+            var self;
+            self = this;
+            return {
+                "app_title": "This title comes from App component"
+            };
+        }, 
+        components: {
+            "Page": Page
+        }
+    };
+    app = new Vue(App);
+    app.$mount("#app");
 })()
 })()

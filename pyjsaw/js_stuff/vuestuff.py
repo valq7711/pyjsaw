@@ -7,32 +7,44 @@ class VDot:
     def bind(*args, **kw):
         ...
 
-    def on(*args, **kw):
+    def on(**kw):
         ...
 
-    def show(*args, **kw):
+    def show(js: str):
         ...
 
-    def Is(*args, **kw):
+    def For(js: str):
         ...
 
-    def For(*args, **kw):
+    def If(js: str):
         ...
 
-    def If(*args, **kw):
+    def ElIf(js: str):
         ...
 
-    def ElIf(*args, **kw):
+    def Else():
         ...
 
-    def Else(*args, **kw):
+    def model(js: str):
         ...
 
-    def model(m):
+    def html(js: str):
         ...
 
-    def html(s):
+    def text(js: str):
         ...
 
-    def text(s):
+    def slot(**kw):
         ...
+
+
+class template:
+    ...
+
+
+class slot:
+    ...
+
+
+class component:
+    ...
