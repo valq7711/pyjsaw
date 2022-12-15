@@ -165,7 +165,7 @@ var ϟ_defmod = ϟ_modules.ϟ_defmod;
     Page = {
         template: page_templ, 
         props: {
-            "title": {
+            title: {
                 "type": String, 
                 "default": "Page Title"
             }

@@ -27,11 +27,10 @@ page_templ = VTempl({
 @literal
 class Page:
     template = page_templ
-    # do not use `dict(...)` as we in js,
-    # but you can try Object(foo='bar')
-    props = {
-        'title': {'type': String, 'default': 'Page Title'}
-    }
+
+    @literal
+    class props:
+        title = {'type': String, 'default': 'Page Title'}
 
     def data(self):
         return {
