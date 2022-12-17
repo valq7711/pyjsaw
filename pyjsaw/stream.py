@@ -7,6 +7,7 @@ Error = RuntimeError
 
 PREFIX = 'ϟ'
 
+
 def _noop():
     pass
 
@@ -152,8 +153,6 @@ class Stream:
         cls_def = self.ns_stack[-1]
         cls_def.on_method(meth_def)
 
-
-
     def push_node(self, node):
         self.node_stack.append(node)
 
@@ -296,7 +295,7 @@ class Stream:
 
     def sequence(self, *items, sep=','):
         for i, it in enumerate(items):
-            if i:
+            if i and sep:
                 self.print_(sep)
                 self.space()
             it_print = getattr(it, 'print', None)
@@ -373,6 +372,8 @@ class Stream:
         self.print_(self.make_string(s, quotes=True))
 
     def print_stmt(self, stmt):
+        if getattr(stmt, 'is_empty_stmt', None):
+            return
         with self.as_statement():
             stmt_print = getattr(stmt, 'print', None)
             if stmt_print is not None:

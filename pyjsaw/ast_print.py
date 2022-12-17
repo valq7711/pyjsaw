@@ -9,6 +9,8 @@ from pyjsaw.js_stuff import html
 
 DOLLAR_SIGN = True
 
+_MISSING = object()
+
 
 def with_dollar_prefix(s: str) -> str:
     if DOLLAR_SIGN and s.startswith(('S_', 'SS_')):
@@ -277,10 +279,9 @@ class ModuleBodyWrapper(RSNode, ScopeMixin, Scope):
         self.exports = {}
         out.push_scope(self)
         for st in self.body:
-            with out.as_statement():
-                st.print(out)
-                if isinstance(st, (FunctionDef, ClassDef)):  # TODO use emit as it maybe wrapped in if-else
-                    self.exports[st.name] = st
+            out.print_stmt(st)
+            if isinstance(st, (FunctionDef, ClassDef)):  # TODO use emit as it maybe wrapped in if-else
+                self.exports[st.name] = st
         out.pop_scope()
 
 
@@ -531,8 +532,9 @@ class Attribute(RSNode[ast.Attribute]):
 
     def created(self):
         super().created()
-        if isinstance(self.value, Name) and self.value.id == '__CompilerDirective__':
+        if Utils.is_name(self.value, '__CompilerDirective__'):
             self.is_directive = True
+            return
         self.attr = with_dollar_prefix(self.attr)
 
     def _print(self):
@@ -593,8 +595,10 @@ class _Directive(RSNode[None]):
         out = self._output
         out.emit_directive(self.name, self.value)
 
+
 class operator(RSNode[ast.AST]):
-    value: str
+    value: str = None
+
 
 class AugAssign(RSNode[ast.AugAssign]):
     target: expr = NodeAttr()
@@ -603,8 +607,16 @@ class AugAssign(RSNode[ast.AugAssign]):
 
     def _print(self):
         out = self._output
-        with out.as_statement():
-            out.spaced(self.target, f'{self.op.value}=', self.value)
+        args = [self.target]
+        if self.op.value in ['-', '+'] and Utils.is_constant(self.value, 1):
+            args.append(self.op.value * 2)
+        else:
+            args.append(f'{self.op.value}=')
+            args.append(self.value)
+        if len(args) == 2:
+            out.sequence(*args, sep='')
+        else:
+            out.spaced(*args)
 
 
 class Assign(RSNode[ast.Assign]):
@@ -856,9 +868,6 @@ class Call(BaseCall):
                 )
 
     def _print(self):
-        if self.func_name == 'iif':
-            self._print_iif()
-            return
         out = self._output
         is_super_call = False
         if self.func_name:
@@ -888,34 +897,27 @@ class Call(BaseCall):
         if is_super_call:
             out.emit_super_call()
 
-    def _print_iif(self):
-        out = self._output
-        cond = self.args[0]
-        p = out.parent()
-        with out.in_parens(isinstance(p, (BinOp, UnaryOp, Compare, Subscript))):
-            cond.print(
-                out, force_parens=not isinstance(cond, (Name, Call))
-            )
-            out.space()
-            out.print_('?')
-            out.space()
-            self.args[1].print(out)
-            out.space()
-            out.colon()
-            self.args[2].print(out)
-
 
 class IfExp(RSNode[ast.IfExp]):
     test: expr = NodeAttr()
     body: expr = NodeAttr()
     orelse: expr = NodeAttr()
 
-    def created(self):
-        return Call(
-            self._pynode,
-            func=Name(None, id='iif'),
-            args=[self.test, self.body, self.orelse]
-        )
+    def _print(self):
+        out = self._output
+        cond = self.test
+        p = out.parent()
+        with out.in_parens(isinstance(p, (BinOp, UnaryOp, Compare, Subscript))):
+            cond.print(
+                out, force_parens=not isinstance(cond, (Name, Call, Constant))
+            )
+            out.space()
+            out.print_('?')
+            out.space()
+            self.body.print(out)
+            out.space()
+            out.colon()
+            self.orelse.print(out)
 
 
 class RShift(operator):
@@ -1591,11 +1593,21 @@ class Slice(RSNode[ast.Slice]):
             out.sequence(self.lower, self.upper)
 
 
-
 class Subscript(RSNode[ast.Subscript]):
     value: expr = NodeAttr()
     slice: expr = NodeAttr()
     ctx: Union[Load, Store]
+
+    def created(self):
+        if isinstance(self.value, Name) and self.value.id == 'iif':
+            assert (
+                type(self.slice) is Tuple and len(self.slice.elts) == 2
+                and type(self.slice.elts[0] is Slice)
+            )
+            tst_slice: Slice = self.slice.elts[0]
+            test, body = tst_slice.lower, tst_slice.upper
+            orelse = self.slice.elts[1]
+            return IfExp(self._pynode, test=test, body=body, orelse=orelse)
 
     def _print(self):
         out = self._output
@@ -1638,8 +1650,7 @@ class If(RSNode[ast.If]):
                 cond.print(out)
         with out.in_block():
             for st in body:
-                with out.as_statement():
-                    st.print(out)
+                out.print_stmt(st)
 
     def _print(self):
         out = self._output
@@ -1732,16 +1743,15 @@ class For(RSNode[ast.For]):
                 tmp_counter = Name(None)
                 tmp_counter.id = out.newTemp()
 
-                tmp_counter_assign = Assign(None)
-                tmp_counter_assign.targets = [tmp_counter]
-                tmp_counter_assign.value = Constant(None)
-                tmp_counter_assign.value.value = 0
-                with out.as_statement():
-                    tmp_counter_assign.print(out)
+                tmp_counter_assign = Assign(
+                    None,
+                    targets=[tmp_counter],
+                    value=Constant(None, value=0)
+                )
+                out.print_stmt(tmp_counter_assign)
+                out.indent()
 
-                counter_assign = Assign(None)
-                counter_assign.targets = [counter]
-                counter_assign.value = tmp_counter
+                counter_assign = Assign(None, targets=[counter], value=tmp_counter)
             elif iter.func.id == 'iterkeys':
                 iter = iter.args[0]
                 op = 'in'
@@ -1761,21 +1771,18 @@ class For(RSNode[ast.For]):
             if counter:
                 with out.as_statement():
                     counter_assign.print(out)
-                    # TODO use augassign
                     out.print_('++')
             for st in self.body:
-                with out.as_statement():
-                    st.print(out)
+                out.print_stmt(st)
 
     def _print_range(self):
         out = self._output
 
         args = self.iter.args
-        step = 1
+        step = None
         # end
         if len(args) == 1:
-            start = Constant(None)
-            start.value = 0
+            start = Constant(None, value=0)
             end = args[0]
         # start, end, [step]
         elif len(args) >= 2:
@@ -1795,19 +1802,20 @@ class For(RSNode[ast.For]):
             end = Name(None)
             end.id = tmp
 
-        if not isinstance(step, (Name, Constant)):
+        if step is not None and not isinstance(step, (Name, Constant)):
             tmp = out.newTemp()
             out.assign_vars(tmp)
             step.print(out)
             out.end_statement()
             out.indent()
-            step = Name(None)
-            step.id = tmp
+            step = Name(None, id=tmp)
 
-        cond = Compare(None)
-        cond.left = self.target
-        cond.ops = [Lt]
-        cond.comparators = [end]
+        if step is None:
+            step = Constant(None, value=1)
+
+        inc = AugAssign(None, target=self.target, op=operator(None, value='+'), value=step)
+
+        cond = Compare(None, left=self.target, ops=[Lt], comparators=[end])
 
         out.print_('for')
         with out.in_parens():
@@ -1818,16 +1826,10 @@ class For(RSNode[ast.For]):
             out.semicolon(space=True)
             cond.print(out)
             out.semicolon(space=True)
-            self.target.print(out)
-            if step == 1:
-                out.print_('++')
-            else:
-                out.print_(' += ')  # TODO - augassign
-                step.print(out)
+            inc.print(out)
         with out.in_block():
             for st in self.body:
-                with out.as_statement():
-                    st.print(out)
+                out.print_stmt(st)
 
 
 class While(RSNode[ast.While]):
@@ -1842,8 +1844,7 @@ class While(RSNode[ast.While]):
             self.test.print(out)
         with out.in_block():
             for st in self.body:
-                with out.as_statement():
-                    st.print(out)
+                out.print_stmt(st)
 
 
 class Break(RSNode[ast.Break]):
@@ -1877,8 +1878,7 @@ class Nonlocal(_externals, RSNode[ast.Nonlocal]):
 
 
 class Pass(RSNode[ast.Pass]):
-    def _print(self):
-        pass
+    is_empty_stmt = True
 
 
 class Return(RSNode[ast.Return]):
@@ -2074,8 +2074,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
                     if st.has_self_arg is None:
                         st.has_self_arg = True
                     self.methods.append(st)
-                    with out.as_statement():
-                        st.print(out)
+                    out.print_stmt(st)
                     if st.static:
                         self.class_attrs.append(st._name)
             self._print_footer()
@@ -2093,10 +2092,8 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         for st in self.class_attrs:
             getter = self._inst_class_attr_getter(st.id)
             setter = self._inst_attr_setter(st.id)
-            with out.as_statement():
-                getter.print(out)
-            with out.as_statement():
-                setter.print(out)
+            out.print_stmt(getter)
+            out.print_stmt(setter)
 
     def _apply_decorators(self):
         out = self._output
@@ -2157,12 +2154,12 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
             self_name = Name(None, id=self.name)
             dec_expr = DecoratedExpr(self_name, self.decorator_list)
             self_decorate = Assign(None, targets=[self_name], value=dec_expr, emit=False)
-            with out.as_statement():
-                self_decorate.print(out)
+            out.print_stmt(self_decorate)
 
 
 class ForComp(For):
     ifexp: expr = None
+
 
 class comprehension(RSNode[ast.comprehension]):
     target: expr = NodeAttr()
@@ -2177,6 +2174,7 @@ class comprehension(RSNode[ast.comprehension]):
             iter=self.iter,
             ifexp=self.ifs[0] if self.ifs else None
         )
+
 
 class BaseComp(RSNode[None]):
     generators: tpList[ForComp] = NodeAttr()
@@ -2342,8 +2340,7 @@ class Try(RSNode[ast.Try]):
         out.print_('try')
         with out.in_block():
             for st in self.body:
-                with out.as_statement():
-                    st.print(out)
+                out.print_stmt(st)
         if self.catch_body:
             out.print_('catch')
             if self.err_name_required:
@@ -2351,14 +2348,12 @@ class Try(RSNode[ast.Try]):
                     self._catch_error().print(out)
             with out.in_block():
                 for stmt in self.catch_body:
-                    with out.as_statement():
-                        stmt.print(out)
+                    out.print_stmt(stmt)
         if self.finalbody:
             out.print_('finally')
             with out.in_block():
                 for stmt in self.finalbody:
-                    with out.as_statement():
-                        stmt.print(out)
+                    out.print_stmt(stmt)
 
 
 class VCall(Call):
@@ -2560,3 +2555,14 @@ class VDict(Dict):
                             out.newline()
                         out.indent()
                         out.print_(f'</{tag.tag_name}>')
+
+
+class Utils:
+
+    @staticmethod
+    def is_constant(exp, value=_MISSING):
+        return isinstance(exp, Constant) and (exp.value == value if value is not _MISSING else True)
+
+    @staticmethod
+    def is_name(exp, value=_MISSING):
+        return isinstance(exp, Name) and (exp.id == value if value is not _MISSING else True)

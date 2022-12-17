@@ -1,4 +1,4 @@
-from pyjsaw.js_stuff.js_obj import Object, Array, this, typeof
+from pyjsaw.typing.jstyping import Object, Array, this, typeof
 
 
 def __def_modules__():
@@ -7,12 +7,13 @@ def __def_modules__():
     def set_export(prop, get, set):
         rs_mod = this
         if Array.isArray(prop):
-            f"{'for(args of prop){rs_mod.export(...args)}'}"
+            for args in iter(prop):
+                rs_mod.export(*args)
             return
 
         if typeof(get) == 'string':
             mod_id = get
-            get = lambda: modules[mod_id]
+            get = lambda: modules[mod_id]  # noqa
             set = None
 
         def_prop = {

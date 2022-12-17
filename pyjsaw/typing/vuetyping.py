@@ -14,7 +14,3 @@ class VueRouter:
 
 class RouterLink:
     ...
-
-
-def slot():
-    ...

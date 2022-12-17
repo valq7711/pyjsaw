@@ -201,7 +201,7 @@ class Module:
             self.output = stream.get()
 
     def wrapped(self):
-        return '\n'.join(['(function(){', self.output, '})()'])
+        return '\n'.join(['(function(){', "'use strict';", self.output, '})()'])
 
     def request_baselib_fun(self, fun: str, mangled: str = None, *, maybe=False):
         if self.is_typing:

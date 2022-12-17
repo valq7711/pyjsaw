@@ -133,3 +133,6 @@ def setTimeout(fun, timeout):
 
 def alert(msg):
     ...
+
+
+iif = []
