@@ -116,6 +116,11 @@ def literal(cls: Type[T]) -> T:
     return cls()
 
 
+def promotestatic(cls: Type[T]) -> Type[T]:
+    '''Expose class attrs at instance level via getters'''
+    return cls
+
+
 class Promise:
 
     @staticmethod
@@ -136,3 +141,7 @@ def alert(msg):
 
 
 iif = []
+
+
+def iterkeys():
+    '''Produce pure js for-in (fake function)'''

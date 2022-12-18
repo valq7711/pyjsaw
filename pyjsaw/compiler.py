@@ -83,6 +83,7 @@ class Module:
         self.baselib_imports: Dict[str, bool] = {}
         self.embed_ctx = embed_ctx or {}
         self.is_typing = False
+        self.is_pyjsaw_stuff = False
         self.is_init = fp.name == '__init__.py'
         if not mod_id:
             self.pkg_id = None
@@ -131,8 +132,11 @@ class Module:
         self.exports = exp
 
     def is_typing_module(self, imp_pth: str):
-        for mod_id in imp_pth.split('.'):
-            mod = self.top_level.all_modules.get(mod_id)
+        parts = imp_pth.split('.')
+        mod_id = []
+        for p in parts:
+            mod_id.append(p)
+            mod = self.top_level.all_modules.get('.'.join(mod_id))
             if not mod:
                 break
             elif mod.is_typing:
@@ -183,7 +187,7 @@ class Module:
         if self.top_level is self:
             self.print_baselib(stream)
             stream.newline()
-            printable_modules = {k: m for k, m in self.all_modules.items() if not m.is_typing}
+            printable_modules = {k: m for k, m in self.all_modules.items() if not (m.is_typing or m.is_pyjsaw_stuff)}
             if printable_modules:
                 for mod_id, mod_obj in printable_modules.items():
                     stream.print_stmt(f'{PREFIX}_defmod("{mod_id}")')
@@ -204,7 +208,7 @@ class Module:
         return '\n'.join(['(function(){', "'use strict';", self.output, '})()'])
 
     def request_baselib_fun(self, fun: str, mangled: str = None, *, maybe=False):
-        if self.is_typing:
+        if self.is_typing or self.is_pyjsaw_stuff:
             return
         if maybe:
             if fun in self.top_level._baselib_mod.exports:
@@ -252,11 +256,14 @@ class Module:
         mod = Module(mod_path, mod_id, self)
         self.all_modules[mod_id] = mod
         mod_id_dot = f'{mod_id}.'
-        if not mod_id_dot.startswith('pyjsaw.') or mod_id_dot.startswith('pyjsaw.typing.'):
+        if (
+            not mod_id_dot.startswith('pyjsaw.')
+            or mod_id_dot.startswith('pyjsaw.typing.') or mod_id_dot.startswith('pyjsaw.pyjs.')
+        ):
             print('compile:', mod_id)
             mod.compile()
         else:
-            mod.is_typing = True
+            mod.is_pyjsaw_stuff = True
 
         self.import_stack.pop()
 

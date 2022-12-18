@@ -1589,8 +1589,15 @@ class Slice(RSNode[ast.Slice]):
         if self.step:
             raise SyntaxError('Stepped slice is not supported')
         out.print_('.slice')
+        args = []
+        lower = self.lower
+        if lower is None:
+            lower = '0'
+        args.append(lower)
+        if self.upper:
+            args.append(self.upper)
         with out.in_parens():
-            out.sequence(self.lower, self.upper)
+            out.sequence(*args)
 
 
 class Subscript(RSNode[ast.Subscript]):
@@ -1949,6 +1956,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
     methods: tpList[FunctionDef]
     class_attrs: tpList[Assign]
 
+    _promote_static = False
     _in_postproc = False
 
     def on_assign(self, ent):
@@ -2054,10 +2062,35 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         ret = Assign(self._pynode, targets=[Name(None, id=self.name)], value=literal)
         return ret
 
+    def _resolve_decorators(self):
+        if not self.decorator_list:
+            return
+        out = self._output
+        dec_list = []
+        for dec in self.decorator_list:
+            if isinstance(dec, Name):
+                if dec.id == 'promotestatic':
+                    self._promote_static = True
+                else:
+                    dec_list.append(dec)
+                continue
+            tmp = out.newTemp()
+            tmp_name = Name(None, id=tmp)
+            tmp_assign = Assign(
+                None,
+                targets=[tmp_name],
+                value=dec
+            )
+            out.print_stmt(tmp_assign)
+            out.indent()
+            dec_list.append(tmp_name)
+        self.decorator_list[:] = dec_list
+
     def _print(self):
         self._in_postproc = False
         self.methods = []
         self.class_attrs: tpList[Name] = []
+        self._resolve_decorators()
         out = self._output
         out.emit_assignment(Entity(self.name, 'class', self))
         out.spaced('class', self.name)
@@ -2083,7 +2116,7 @@ class ClassDef(RSNode[ast.ClassDef], Scope):
         out.newline()
 
     def _print_footer(self):
-        if not self.class_attrs:
+        if not (self.class_attrs and self._promote_static):
             return
         out = self._output
         out.indent()
