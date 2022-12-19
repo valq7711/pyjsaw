@@ -21,6 +21,7 @@ def is_special(name):
 def vopt_from_class(cls):
     v_collector = cls.__vue_opt__
     vcd = {}  # vue component definition
+    vcd.name = cls.name
     vcd.props = {}
     vcd.methods = {}
     if v_collector:
