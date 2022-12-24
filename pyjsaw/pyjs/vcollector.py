@@ -1,4 +1,4 @@
-from pyjsaw.typing.jstyping import Set, RegExp, Object, iif, this, iterkeys, typeof, Array
+from pyjsaw.typing.jstyping import Set, RegExp, Object, iif, this, iterkeys, typeof, Array, undefined
 
 _SPECIAL_VUEMETHODS = Set([
     'beforeCreate', 'created',
@@ -62,7 +62,17 @@ def vopt_from_class(cls):
         if prop_name == 'template' and typeof(cls[prop_name]) == 'string':
             vcd[prop_name] = cls[prop_name]
         else:
-            vcd.props[prop_name] = cls[prop_name]
+            # vcd.props[prop_name] = cls[prop_name]
+            prop = cls[prop_name]
+            if Array.isArray(prop):
+                prop_ = {}
+                keys = ['type', 'default', 'required', 'validator']
+                for i, v in enumerate(iter(prop)):
+                    if v is undefined:
+                        continue
+                    prop_[keys[i]] = v
+                prop = prop_
+            vcd.props[prop_name] = prop
 
     # set extra options and call postproc
     if hasattr(cls, '_extra'):

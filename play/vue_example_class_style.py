@@ -35,7 +35,7 @@ page_templ = VTempl({
 class Page:
     template = page_templ
 
-    title = {'type': String, 'default': 'Page Title'}
+    title = String, 'Page Title'
 
     def data(data_obj, vm: 'Page'):
         data_obj.footer_visible = False
