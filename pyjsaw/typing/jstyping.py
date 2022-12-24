@@ -95,6 +95,10 @@ class Math:
     def pow():
         ...
 
+    @staticmethod
+    def round():
+        ...
+
 
 def typeof(obj):
     ...

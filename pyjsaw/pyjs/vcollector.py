@@ -1,4 +1,4 @@
-from pyjsaw.typing.jstyping import Set, RegExp, Object, iif, this, iterkeys, typeof
+from pyjsaw.typing.jstyping import Set, RegExp, Object, iif, this, iterkeys, typeof, Array
 
 _SPECIAL_VUEMETHODS = Set([
     'beforeCreate', 'created',
@@ -72,6 +72,11 @@ def vopt_from_class(cls):
         ret = cls['_postproc'](vcd)
         if ret:
             vcd = ret
+
+    if Array.isArray(vcd.components):
+        # assuming it is array of components and each component has `name`-attr
+        vcd.components = {c.name: c for c in iter(vcd.components)}
+
     return vcd
 
 
@@ -117,8 +122,9 @@ class VCollector:
                 return fun_opt
 
         cur[reg_as][name] = fun_opt
-        cur.__collected__[name] = True
-        return iif[fun_opt.handler: fun_opt.handler, fun_opt]
+        fun = iif[fun_opt.handler: fun_opt.handler, fun_opt]
+        cur.__collected__[fun.name] = True
+        return fun
 
     def computed(self, fun):
         fun_name = fun.__name__ or fun.name
@@ -127,16 +133,19 @@ class VCollector:
         return self._reg_as('_computed', fun_name, fun)
 
     def filter(self, fun):
-        return self._reg_as('_filters', fun.name, fun)
+        fun_name = fun.__name__ or fun.name
+        return self._reg_as('_filters', fun_name, fun)
 
     def directive(self, fun):
-        return self._reg_as('_directives', fun.name, fun)
+        fun_name = fun.__name__ or fun.name
+        return self._reg_as('_directives', fun_name, fun)
 
     def watch(self, name, opt):
+        if not opt:
+            opt = {}
+
         def wrapper(fun):
-            opt_ = {'handler': fun}
-            if opt:
-                Object.assign(opt_, opt)
+            opt.handler = fun
             return self._reg_as('_watch', name, opt)
         return wrapper
 

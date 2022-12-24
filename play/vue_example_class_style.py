@@ -43,6 +43,10 @@ class Page:
     def toggle_footer(self):
         self.footer_visible = not self.footer_visible
 
+    @vc.watch('footer_visible')
+    def footer_visible_watcher(self, n, o):
+        print(f'footer_visible changed from {o} to {n}')
+
 
 app_templ = VTempl({
     Page(v.bind(title='app_title')): {
@@ -66,7 +70,7 @@ class App:
     # to register globally: Vue.component('Page', Page)
     @literal
     class _extra:
-        components = {'Page': Page}
+        components = [Page]
 
 
 app = Vue(App)   # just `App`,  not `App()` - no parens here as it is `@literal` not a real class
