@@ -2474,15 +2474,19 @@ class VTag(Call):
         super().created()
         args = []
         for a in self.args:
-            assert isinstance(a, Call)
-            args.append(
-                VCall(
-                    None,
-                    func=a.func,
-                    args=a.args,
-                    keywords=a.keywords
+            if isinstance(a, Call):
+                args.append(
+                    VCall(
+                        None,
+                        func=a.func,
+                        args=a.args,
+                        keywords=a.keywords
+                    )
                 )
-            )
+            else:
+                assert isinstance(a, Dict)
+                for k, v in zip(a.keys, a.values):
+                    self.keywords.append(keyword(None, arg=k.value, value=v))
         self.args[:] = args
 
     def morph(self):

@@ -62,7 +62,6 @@ def vopt_from_class(cls):
         if prop_name == 'template' and typeof(cls[prop_name]) == 'string':
             vcd[prop_name] = cls[prop_name]
         else:
-            # vcd.props[prop_name] = cls[prop_name]
             prop = cls[prop_name]
             if Array.isArray(prop):
                 prop_ = {}
