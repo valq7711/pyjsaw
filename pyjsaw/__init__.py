@@ -1,7 +1,8 @@
 from pyjsaw.compiler import compile
 
 __all__ = [
-    'compile'
+    'compile',
+    '__version__'
 ]
 
 __version__ = '1.0.0'

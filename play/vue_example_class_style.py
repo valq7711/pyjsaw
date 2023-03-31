@@ -8,6 +8,7 @@ from pyjsaw.pyjs.vcollector import vc
 # VTempl is special built-in
 page_templ = VTempl({
     h.Div(): {
+        h.Div({'aria-foo': 'bar'}, Class='some-class'): None,
         h.H3():
             '{{title}}',
         h.Div(Class='header'): {
@@ -21,12 +22,20 @@ page_templ = VTempl({
         h.Button(v.on(click='toggle_footer')):   # we can just 'footer_visible = !footer_visible'
             "{{footer_visible ? 'Hide' : 'Show' }} footer",
 
+        h.Button(v.on({'click.stop': 'toggle_footer'})):
+            "{{footer_visible ? 'Hide' : 'Show' }} footer",
+
         h.Div(
             v.show('footer_visible'),
             Class='footer'
         ): {
             slot(name='footer'): '[default footer]'
         },
+
+        h.Form(): {
+            h.Input(action='/qq'): None,
+            h.Button(type='button'): 'qq',
+        }
     }
 })
 
