@@ -28,10 +28,16 @@ dynamic = ["version"]
 homepage = "https://github.com/valq7711/pyjsaw"
 repository = "https://github.com/valq7711/pyjsaw"
 
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["pyjsaw"]
 zip-safe = false
+
+[tool.setuptools.packages.find]
+include= ["pyjsaw*"]
+namespaces = false
 
 [tool.setuptools.dynamic]
 version = {attr = "pyjsaw.__version__"}

@@ -1,6 +1,6 @@
 import sys
-import os
 import importlib.util as imp_util
+import logging
 
 from typing import Dict, Union
 from pathlib import Path
@@ -10,6 +10,8 @@ from pyjsaw.stream import Stream
 import pyjsaw.ast_print as ast_print
 from pyjsaw.ast_print import PREFIX, Import, alias
 from pyjsaw.utils import imp_to_path
+
+logger = logging.getLogger(__name__)
 
 
 class NodeTransformer:
@@ -260,7 +262,7 @@ class Module:
             not mod_id_dot.startswith('pyjsaw.')
             or mod_id_dot.startswith('pyjsaw.typing.') or mod_id_dot.startswith('pyjsaw.pyjs.')
         ):
-            print('compile:', mod_id)
+            logger.debug(f'compile: {mod_id}')
             mod.compile()
         else:
             mod.is_pyjsaw_stuff = True
