@@ -1559,12 +1559,15 @@ class Dict(RSNode[ast.Dict]):
                     out.comma()
                     out.newline()
                 out.indent()
-                if not isinstance(k, Constant):
-                    with out.in_square():
-                        k.print(out)
+                if k is None:  # unpacking {**some}
+                    out.print_('...')
                 else:
-                    k.print(out)
-                out.colon()
+                    if not isinstance(k, Constant):
+                        with out.in_square():
+                            k.print(out)
+                    else:
+                        k.print(out)
+                    out.colon()
                 v.print(out)
             out.newline()
 
