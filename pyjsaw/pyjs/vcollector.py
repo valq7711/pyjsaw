@@ -38,7 +38,7 @@ def vopt_from_class(cls):
     if data_setup:
         def data():
             data_obj = {}
-            data_setup.call(data_obj, [this])
+            data_setup.call(data_obj, this)
             return data_obj
         vcd.data = data
 
